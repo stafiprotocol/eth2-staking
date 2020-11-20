@@ -1,0 +1,14 @@
+{
+  "name": "eth2-staking",
+  "version": "0.1.0",
+  "description": "",
+  "repository": "https://github.com/stafiprotocol/eth2-staking",
+  "scripts": {
+    "compile": "truffle compile"
+  },
+  "author": "Stafi Technologies",
+  "license": "GPL-3.0-only",
+  "devDependencies": {
+    "@openzeppelin/contracts": "^3.2.0"
+  }
+}
