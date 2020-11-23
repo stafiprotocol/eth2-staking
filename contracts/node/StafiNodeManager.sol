@@ -16,15 +16,6 @@ contract StafiNodeManager is StafiBase, IStafiNodeManager {
     // Construct
     constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {
         version = 1;
-        setRegistrationEnabled(true);
-    }
-
-    // Node registrations currently enabled
-    function getRegistrationEnabled() public view returns (bool) {
-        return getBoolS("settings.node.registration.enabled");
-    }
-    function setRegistrationEnabled(bool _value) public onlySuperUser {
-        setBoolS("settings.node.registration.enabled", _value);
     }
 
     // Get the number of nodes in the network
@@ -62,27 +53,23 @@ contract StafiNodeManager is StafiBase, IStafiNodeManager {
     }
 
     // Register a new node
-    function registerNode() override external onlyLatestContract("stafiNodeManager", address(this)) {
-        // Load contracts
-        IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
-        // Check node settings
-        require(getRegistrationEnabled(), "Node registrations are currently disabled");
-        // Check node is not registered
-        require(!getBool(keccak256(abi.encodePacked("node.exists", msg.sender))), "The node is already registered in the network");
-        // Initialise node data
-        setBool(keccak256(abi.encodePacked("node.exists", msg.sender)), true);
-        setBool(keccak256(abi.encodePacked("node.trusted", msg.sender)), false);
-        // Add node to index
-        addressSetStorage.addItem(keccak256(abi.encodePacked("nodes.index")), msg.sender);
-        // Emit node registered event
-        emit NodeRegistered(msg.sender, now);
+    function registerNode(address _nodeAddress) override external onlyLatestContract("stafiNodeManager", address(this)) onlyLatestContract("stafiNodeDeposit", msg.sender) {
+        if (!getBool(keccak256(abi.encodePacked("node.exists", _nodeAddress)))) {
+            // Load contracts
+            IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
+            // Initialise node data
+            setBool(keccak256(abi.encodePacked("node.exists", _nodeAddress)), true);
+            setBool(keccak256(abi.encodePacked("node.trusted", _nodeAddress)), false);
+            // Add node to index
+            addressSetStorage.addItem(keccak256(abi.encodePacked("nodes.index")), _nodeAddress);
+            // Emit node registered event
+            emit NodeRegistered(_nodeAddress, now);
+        }
     }
 
     // Set a node's trusted status
     // Only accepts calls from super users
     function setNodeTrusted(address _nodeAddress, bool _trusted) override external onlyLatestContract("stafiNodeManager", address(this)) onlySuperUser {
-        // Check node exists
-        require(getBool(keccak256(abi.encodePacked("node.exists", _nodeAddress))), "The node does not exist");
         // Check current node status
         require(getBool(keccak256(abi.encodePacked("node.trusted", _nodeAddress))) != _trusted, "The node's trusted status is already set");
         // Load contracts

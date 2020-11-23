@@ -3,15 +3,15 @@ pragma solidity 0.6.12;
 // SPDX-License-Identifier: GPL-3.0-only
 
 import "../StafiBase.sol";
+import "../interfaces/deposit/IStafiNodeDeposit.sol";
 import "../interfaces/deposit/IStafiUserDeposit.sol";
+import "../interfaces/node/IStafiNodeManager.sol";
 import "../interfaces/pool/IStafiStakingPool.sol";
 import "../interfaces/pool/IStafiStakingPoolManager.sol";
-import "../interfaces/deposit/IStafiNodeDeposit.sol";
 import "../interfaces/settings/IStafiStakingPoolSettings.sol";
 import "../types/DepositType.sol";
 
-// Handles node deposits and minipool creation
-
+// Handles node deposits and staking pool creation
 contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
 
     // Events
@@ -31,7 +31,7 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
     }
 
     // Accept a node deposit and create a new staking pool under the node
-    function deposit() override external payable onlyLatestContract("stafiNodeDeposit", address(this)) onlyRegisteredNode(msg.sender) {
+    function deposit() override external payable onlyLatestContract("stafiNodeDeposit", address(this)) {
         // Check node settings
         require(getDepositEnabled(), "Node deposits are currently disabled");
         require(msg.value == getCurrentNodeDepositAmount(), "Invalid node deposit amount");
@@ -49,6 +49,9 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
         require(depositType != DepositType.None, "Invalid node deposit amount");
         // Emit deposit received event
         emit DepositReceived(msg.sender, msg.value, now);
+        // Register the node
+        IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
+        stafiNodeManager.registerNode(msg.sender);
         // Create staking pool
         address stakingPoolAddress = stafiStakingPoolManager.createStakingPool(msg.sender, depositType);
         IStafiStakingPool stakingPool = IStafiStakingPool(stakingPoolAddress);

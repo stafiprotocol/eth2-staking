@@ -9,6 +9,6 @@ interface IStafiNodeManager {
     function getTrustedNodeAt(uint256 _index) external view returns (address);
     function getNodeExists(address _nodeAddress) external view returns (bool);
     function getNodeTrusted(address _nodeAddress) external view returns (bool);
-    function registerNode() external;
+    function registerNode(address _nodeAddress) external;
     function setNodeTrusted(address _nodeAddress, bool _trusted) external;
 }

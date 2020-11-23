@@ -32,15 +32,6 @@ abstract contract StafiBase {
 
 
     /**
-    * @dev Throws if called by any sender that isn't a registered node
-    */
-    modifier onlyRegisteredNode(address _nodeAddress) {
-        require(getBool(keccak256(abi.encodePacked("node.exists", _nodeAddress))), "Invalid node");
-        _;
-    }
-
-
-    /**
     * @dev Throws if called by any sender that isn't a trusted node
     */
     modifier onlyTrustedNode(address _nodeAddress) {
@@ -52,8 +43,8 @@ abstract contract StafiBase {
     /**
     * @dev Throws if called by any sender that isn't a registered staking pool
     */
-    modifier onlyRegisteredStakingPool(address _minipoolAddress) {
-        require(getBool(keccak256(abi.encodePacked("stakingpool.exists", _minipoolAddress))), "Invalid staking pool");
+    modifier onlyRegisteredStakingPool(address _stakingPoolAddress) {
+        require(getBool(keccak256(abi.encodePacked("stakingpool.exists", _stakingPoolAddress))), "Invalid staking pool");
         _;
     }
 
