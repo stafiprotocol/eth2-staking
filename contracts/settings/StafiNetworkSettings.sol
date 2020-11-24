@@ -18,7 +18,8 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
             setNodeConsensusThreshold(0.51 ether); // 51%
             setSubmitBalancesEnabled(true);
             setSubmitBalancesFrequency(5760); // ~24 hours
-            setTargetNodeFee(0.1 ether); // 10%
+            setNodeFee(0.1 ether); // 10%
+            setPlatformFee(0.1 ether); // 10%
             // Settings initialized
             setBoolS("settings.network.init", true);
         }
@@ -48,12 +49,20 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
         setUintS("settings.network.submit.balances.frequency", _value);
     }
 
-    // The target node commission rate as a fraction of 1 ether
-    function getTargetNodeFee() override public view returns (uint256) {
-        return getUintS("settings.network.node.fee.target");
+    // The node commission rate as a fraction of 1 ether
+    function getNodeFee() override public view returns (uint256) {
+        return getUintS("settings.network.node.fee");
     }
-    function setTargetNodeFee(uint256 _value) public onlySuperUser {
-        setUintS("settings.network.node.fee.target", _value);
+    function setNodeFee(uint256 _value) public onlySuperUser {
+        setUintS("settings.network.node.fee", _value);
+    }
+
+    // The platform commission rate as a fraction of 1 ether
+    function getPlatformFee() override public view returns (uint256) {
+        return getUintS("settings.network.platform.fee");
+    }
+    function setPlatformFee(uint256 _value) public onlySuperUser {
+        setUintS("settings.network.platform.fee", _value);
     }
 
     // Get the validator withdrawal credentials

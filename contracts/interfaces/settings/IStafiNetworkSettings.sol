@@ -6,6 +6,7 @@ interface IStafiNetworkSettings {
     function getNodeConsensusThreshold() external view returns (uint256);
     function getSubmitBalancesEnabled() external view returns (bool);
     function getSubmitBalancesFrequency() external view returns (uint256);
-    function getTargetNodeFee() external view returns (uint256);
+    function getNodeFee() external view returns (uint256);
+    function getPlatformFee() external view returns (uint256);
     function getWithdrawalCredentials() external view returns (bytes memory);
 }

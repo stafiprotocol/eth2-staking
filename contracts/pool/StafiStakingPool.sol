@@ -91,7 +91,7 @@ contract StafiStakingPool is IStafiStakingPool {
         nodeAddress = _nodeAddress;
         // Get settings
         IStafiNetworkSettings stafiNetworkSettings = IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
-        nodeFee = stafiNetworkSettings.getTargetNodeFee();
+        nodeFee = stafiNetworkSettings.getNodeFee();
     }
 
     // Only allow access from the owning node address
