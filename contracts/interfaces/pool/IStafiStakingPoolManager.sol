@@ -14,13 +14,9 @@ interface IStafiStakingPoolManager {
     function getStakingPoolByPubkey(bytes calldata _pubkey) external view returns (address);
     function getStakingPoolExists(address _stakingPoolAddress) external view returns (bool);
     function getStakingPoolPubkey(address _stakingPoolAddress) external view returns (bytes memory);
-    function getStakingPoolWithdrawalTotalBalance(address _stakingPoolAddress) external view returns (uint256);
-    function getStakingPoolWithdrawalNodeBalance(address _stakingPoolAddress) external view returns (uint256);
-    function getStakingPoolWithdrawable(address _stakingPoolAddress) external view returns (bool);
     function getStakingPoolWithdrawalProcessed(address _stakingPoolAddress) external view returns (bool);
     function createStakingPool(address _nodeAddress, DepositType _depositType) external returns (address);
     function destroyStakingPool() external;
     function setStakingPoolPubkey(bytes calldata _pubkey) external;
-    function setStakingPoolWithdrawalBalances(address _stakingPoolAddress, uint256 _total, uint256 _node) external;
     function setStakingPoolWithdrawalProcessed(address _stakingPoolAddress, bool _processed) external;
 }

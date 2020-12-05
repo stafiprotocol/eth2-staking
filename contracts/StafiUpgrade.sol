@@ -47,8 +47,6 @@ contract StafiUpgrade is StafiBase, IStafiUpgrade {
         bytes32 nameHash = keccak256(abi.encodePacked(_name));
         require(nameHash != keccak256(abi.encodePacked("")), "Invalid contract name");
         require(getAddress(keccak256(abi.encodePacked("contract.address", _name))) == address(0x0), "Contract name is already in use");
-        string memory existingAbi = getString(keccak256(abi.encodePacked("contract.abi", _name)));
-        require(keccak256(abi.encodePacked(existingAbi)) == keccak256(abi.encodePacked("")), "Contract name is already in use");
         // Check contract address
         require(_contractAddress != address(0x0), "Invalid contract address");
         require(!getBool(keccak256(abi.encodePacked("contract.exists", _contractAddress))), "Contract address is already in use");
@@ -56,6 +54,28 @@ contract StafiUpgrade is StafiBase, IStafiUpgrade {
         setBool(keccak256(abi.encodePacked("contract.exists", _contractAddress)), true);
         setString(keccak256(abi.encodePacked("contract.name", _contractAddress)), _name);
         setAddress(keccak256(abi.encodePacked("contract.address", _name)), _contractAddress);
+        // Emit contract added event
+        emit ContractAdded(nameHash, _contractAddress, now);
+    }
+
+    // Init stafi upgrade contract
+    function initThisContract() external onlySuperUser {
+        addStafiUpgradeContract(address(this));
+        setBool(keccak256(abi.encodePacked("contract.storage.initialised")), true);
+    }
+
+    // Upgrade stafi upgrade contract
+    function upgradeThisContract(address _contractAddress) external onlySuperUser {
+        addStafiUpgradeContract(_contractAddress);
+    }
+
+    // Add stafi upgrade contract
+    function addStafiUpgradeContract(address _contractAddress) private {
+        string memory name = "stafiUpgrade";
+        bytes32 nameHash = keccak256(abi.encodePacked(name));
+        setBool(keccak256(abi.encodePacked("contract.exists", _contractAddress)), true);
+        setString(keccak256(abi.encodePacked("contract.name", _contractAddress)), name);
+        setAddress(keccak256(abi.encodePacked("contract.address", name)), _contractAddress);
         // Emit contract added event
         emit ContractAdded(nameHash, _contractAddress, now);
     }

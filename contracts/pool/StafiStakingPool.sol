@@ -43,6 +43,9 @@ contract StafiStakingPool is IStafiStakingPool {
     bool private userDepositAssigned;
     uint256 private userDepositAssignedTime;
 
+    // Platform details
+    uint256 private platformDepositBalance;
+
     // Staking details
     uint256 private stakingStartBalance;
     uint256 private stakingEndBalance;
@@ -71,6 +74,9 @@ contract StafiStakingPool is IStafiStakingPool {
     function getUserDepositBalance() override public view returns (uint256) { return userDepositBalance; }
     function getUserDepositAssigned() override public view returns (bool) { return userDepositAssigned; }
     function getUserDepositAssignedTime() override public view returns (uint256) { return userDepositAssignedTime; }
+
+    // Platform detail getters
+    function getPlatformDepositBalance() override public view returns (uint256) { return platformDepositBalance; }
 
     // Staking detail getters
     function getStakingStartBalance() override public view returns (uint256) { return stakingStartBalance; }
@@ -171,6 +177,29 @@ contract StafiStakingPool is IStafiStakingPool {
         setStatus(StakingPoolStatus.Staking);
     }
 
+    // Progress the refund
+    // Only accepts calls from the staking pool owner (node)
+    function refund() override external onlyStakingPoolOwner(msg.sender) {
+        // Check current status
+        require(status == StakingPoolStatus.Staking, "The stakingpool can only be refunded while staking");
+        IStafiNetworkSettings stafiNetworkSettings = IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
+        // Calculate node refund amount
+        uint256 calcBase = 1 ether;
+        nodeRefundBalance = nodeDepositBalance.mul(stafiNetworkSettings.getNodeRefundRatio()).div(calcBase);
+        platformDepositBalance = nodeRefundBalance;
+        nodeDepositBalance = nodeDepositBalance.sub(nodeRefundBalance);
+    }
+
+    function setWithdrawn(uint256 _stakingStartBalance, uint256 _stakingEndBalance) override external onlyLatestContract("stafiNetworkWithdrawal", msg.sender) {
+        // Check current status
+        require(status == StakingPoolStatus.Staking, "The stakingpool can only become withdrawn while staking");
+        // Set staking details
+        stakingStartBalance = _stakingStartBalance;
+        stakingEndBalance = _stakingEndBalance;
+        // Progress to withdrawable
+        setStatus(StakingPoolStatus.Withdrawn);
+    }
+
     // Dissolve the staking pool, returning user deposited ETH to the deposit pool
     // Only accepts calls from the staking pool owner (node), or from any address if timed out
     function dissolve() override external {
@@ -206,11 +235,10 @@ contract StafiStakingPool is IStafiStakingPool {
         // Check current status
         require(status == StakingPoolStatus.Dissolved, "The staking pool can only be closed while dissolved");
         // Transfer node balance to node operator
-        uint256 nodeBalance = nodeDepositBalance.add(nodeRefundBalance);
+        uint256 nodeBalance = nodeDepositBalance;
         if (nodeBalance > 0) {
             // Update node balances
             nodeDepositBalance = 0;
-            nodeRefundBalance = 0;
             // Transfer balance
             (bool success,) = nodeAddress.call{value: nodeBalance}("");
             require(success, "Node ETH balance was not successfully transferred to node operator");

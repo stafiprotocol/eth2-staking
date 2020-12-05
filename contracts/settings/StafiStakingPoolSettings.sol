@@ -18,13 +18,12 @@ contract StafiStakingPoolSettings is StafiBase, IStafiStakingPoolSettings {
         // Set version
         version = 1;
         // Initialize settings on deployment
-        // if (!getBoolS("settings.stakingpool.init")) {
-        //     // Apply settings
-        //     setSubmitWithdrawableEnabled(true);
-            setWithdrawalDelay(172800); // ~30 days
-        //     // Settings initialized
-        //     setBoolS("settings.stakingpool.init", true);
-        // }
+        if (!getBoolS("settings.stakingpool.init")) {
+            // Apply settings
+            setLaunchTimeout(5760); // ~24 hours
+            // Settings initialized
+            setBoolS("settings.stakingpool.init", true);
+        }
     }
 
     // Balance required to launch staking pool
@@ -66,23 +65,4 @@ contract StafiStakingPoolSettings is StafiBase, IStafiStakingPoolSettings {
     function setLaunchTimeout(uint256 _value) public onlySuperUser {
         setUintS("settings.stakingpool.launch.timeout", _value);
     }
-
-    // Submit stakingpool withdrawable events currently enabled (trusted nodes only)
-    // function getSubmitWithdrawableEnabled() override public view returns (bool) {
-    //     return getBoolS("settings.stakingpool.submit.withdrawable.enabled");
-    // }
-    // function setSubmitWithdrawableEnabled(bool _value) public onlySuperUser {
-    //     setBoolS("settings.stakingpool.submit.withdrawable.enabled", _value);
-    // }
-
-    // Withdrawal delay in blocks before withdrawable stakingpools can be closed
-    function getWithdrawalDelay() override public view returns (uint256) {
-        return getUintS("settings.stakingpool.withdrawal.delay");
-    }
-    function setWithdrawalDelay(uint256 _value) public onlySuperUser {
-        setUintS("settings.stakingpool.withdrawal.delay", _value);
-    }
-
-    
-
 }

@@ -17,9 +17,10 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
             // Apply settings
             setNodeConsensusThreshold(0.51 ether); // 51%
             setSubmitBalancesEnabled(true);
-            setSubmitBalancesFrequency(5760); // ~24 hours
+            setProcessWithdrawalsEnabled(true);
             setNodeFee(0.1 ether); // 10%
             setPlatformFee(0.1 ether); // 10%
+            setNodeRefundRatio(0.25 ether); // 25%
             // Settings initialized
             setBoolS("settings.network.init", true);
         }
@@ -41,12 +42,12 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
         setBoolS("settings.network.submit.balances.enabled", _value);
     }
 
-    // The frequency in blocks at which network balances should be submitted by trusted nodes
-    function getSubmitBalancesFrequency() override public view returns (uint256) {
-        return getUintS("settings.network.submit.balances.frequency");
+    // Process withdrawals currently enabled (trusted nodes only)
+    function getProcessWithdrawalsEnabled() override public view returns (bool) {
+        return getBoolS("settings.network.process.withdrawals.enabled");
     }
-    function setSubmitBalancesFrequency(uint256 _value) public onlySuperUser {
-        setUintS("settings.network.submit.balances.frequency", _value);
+    function setProcessWithdrawalsEnabled(bool _value) public onlyOwner {
+        setBoolS("settings.network.process.withdrawals.enabled", _value);
     }
 
     // The node commission rate as a fraction of 1 ether
@@ -63,6 +64,14 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
     }
     function setPlatformFee(uint256 _value) public onlySuperUser {
         setUintS("settings.network.platform.fee", _value);
+    }
+
+    // The node refund commission rate as a fraction of 1 ether
+    function getNodeRefundRatio() override public view returns (uint256) {
+        return getUintS("settings.network.node.refund.ratio");
+    }
+    function setNodeRefundRatio(uint256 _value) public onlySuperUser {
+        setUintS("settings.network.node.refund.ratio", _value);
     }
 
     // Get the validator withdrawal credentials

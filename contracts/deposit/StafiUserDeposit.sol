@@ -32,7 +32,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
             setDepositEnabled(true);
             setAssignDepositsEnabled(true);
             setMinimumDeposit(0.01 ether);
-            setMaximumDepositPoolSize(1000 ether);
+            // setMaximumDepositPoolSize(100000 ether);
             setMaximumDepositAssignments(2);
             // Settings initialized
             setBoolS("settings.deposit.init", true);
@@ -65,7 +65,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         // Check deposit settings
         require(getDepositEnabled(), "Deposits into Stafi are currently disabled");
         require(msg.value >= getMinimumDeposit(), "The deposited amount is less than the minimum deposit size");
-        require(getBalance().add(msg.value) <= getMaximumDepositPoolSize(), "The deposit pool size after depositing exceeds the maximum size");
+        // require(getBalance().add(msg.value) <= getMaximumDepositPoolSize(), "The deposit pool size after depositing exceeds the maximum size");
         // Load contracts
         IRETHToken rETHToken = IRETHToken(getContractAddress("rETHToken"));
         // Mint rETH to user account
@@ -168,12 +168,12 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
     }
 
     // The maximum size of the deposit pool
-    function getMaximumDepositPoolSize() public view returns (uint256) {
-        return getUintS("settings.deposit.pool.maximum");
-    }
-    function setMaximumDepositPoolSize(uint256 _value) public onlySuperUser {
-        setUintS("settings.deposit.pool.maximum", _value);
-    }
+    // function getMaximumDepositPoolSize() public view returns (uint256) {
+    //     return getUintS("settings.deposit.pool.maximum");
+    // }
+    // function setMaximumDepositPoolSize(uint256 _value) public onlySuperUser {
+    //     setUintS("settings.deposit.pool.maximum", _value);
+    // }
 
     // The maximum number of deposit assignments to perform at once
     function getMaximumDepositAssignments() public view returns (uint256) {

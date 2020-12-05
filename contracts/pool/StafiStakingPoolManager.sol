@@ -73,21 +73,6 @@ contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
         return getBytes(keccak256(abi.encodePacked("stakingpool.pubkey", _stakingPoolAddress)));
     }
 
-    // Get a staking pool's total balance at withdrawal
-    function getStakingPoolWithdrawalTotalBalance(address _stakingPoolAddress) override public view returns (uint256) {
-        return getUint(keccak256(abi.encodePacked("stakingpool.withdrawal.balance.total", _stakingPoolAddress)));
-    }
-
-    // Get a staking pool's node balance at withdrawal
-    function getStakingPoolWithdrawalNodeBalance(address _stakingPoolAddress) override public view returns (uint256) {
-        return getUint(keccak256(abi.encodePacked("stakingpool.withdrawal.balance.node", _stakingPoolAddress)));
-    }
-
-    // Get a staking pool's withdrawable status
-    function getStakingPoolWithdrawable(address _stakingPoolAddress) override public view returns (bool) {
-        return getBool(keccak256(abi.encodePacked("stakingpool.withdrawable", _stakingPoolAddress)));
-    }
-
     // Get a staking pool's withdrawal processed status
     function getStakingPoolWithdrawalProcessed(address _stakingPoolAddress) override public view returns (bool) {
         return getBool(keccak256(abi.encodePacked("stakingpool.withdrawal.processed", _stakingPoolAddress)));
@@ -143,13 +128,6 @@ contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
         setAddress(keccak256(abi.encodePacked("validator.stakingpool", _pubkey)), msg.sender);
         // Add staking pool to node validating stakingpools index
         addressSetStorage.addItem(keccak256(abi.encodePacked("node.stakingpools.validating.index", nodeAddress)), msg.sender);
-    }
-
-    // Set a staking pool's withdrawal balances and withdrawable status
-    function setStakingPoolWithdrawalBalances(address _stakingPoolAddress, uint256 _total, uint256 _node) override external onlyLatestContract("stafiStakingPoolManager", address(this)) onlyLatestContract("stafiStakingPoolStatus", msg.sender) {
-        setUint(keccak256(abi.encodePacked("stakingpool.withdrawal.balance.total", _stakingPoolAddress)), _total);
-        setUint(keccak256(abi.encodePacked("stakingpool.withdrawal.balance.node", _stakingPoolAddress)), _node);
-        setBool(keccak256(abi.encodePacked("stakingpool.withdrawable", _stakingPoolAddress)), true);
     }
 
     // Set a staking pool's withdrawal processed status

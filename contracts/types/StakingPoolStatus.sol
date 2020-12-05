@@ -7,6 +7,6 @@ enum StakingPoolStatus {
     Initialized,    // The stakingpool has been initialized and is awaiting a deposit of user ETH
     Prelaunch,      // The stakingpool has enough ETH to begin staking and is awaiting launch by the node
     Staking,        // The stakingpool is currently staking
-    Withdrawable,   // The stakingpool has become withdrawable on the beacon chain and can be withdrawn from by the node
+    Withdrawn,   // The stakingpool has been withdrawn from by the node
     Dissolved       // The stakingpool has been dissolved and its user deposited ETH has been returned to the deposit pool
 }
