@@ -58,10 +58,14 @@ contract StafiUpgrade is StafiBase, IStafiUpgrade {
         emit ContractAdded(nameHash, _contractAddress, now);
     }
 
+    // Init stafi storage contract
+    function initStorage(bool _value) external onlySuperUser {
+        setBool(keccak256(abi.encodePacked("contract.storage.initialised")), _value);
+    }
+
     // Init stafi upgrade contract
     function initThisContract() external onlySuperUser {
         addStafiUpgradeContract(address(this));
-        setBool(keccak256(abi.encodePacked("contract.storage.initialised")), true);
     }
 
     // Upgrade stafi upgrade contract

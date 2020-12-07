@@ -46,7 +46,7 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
     function getProcessWithdrawalsEnabled() override public view returns (bool) {
         return getBoolS("settings.network.process.withdrawals.enabled");
     }
-    function setProcessWithdrawalsEnabled(bool _value) public onlyOwner {
+    function setProcessWithdrawalsEnabled(bool _value) public onlySuperUser {
         setBoolS("settings.network.process.withdrawals.enabled", _value);
     }
 
