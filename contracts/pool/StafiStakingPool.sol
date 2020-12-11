@@ -182,6 +182,12 @@ contract StafiStakingPool is IStafiStakingPool {
     function refund() override external onlyStakingPoolOwner(msg.sender) {
         // Check current status
         require(status == StakingPoolStatus.Staking, "The stakingpool can only be refunded while staking");
+        require(nodeRefundBalance == 0, "The stakingpool has already been refunded");
+        // Check if being dissolved by staking pool owner or staking pool is timed out
+        IStafiStakingPoolSettings stafiStakingPoolSettings = IStafiStakingPoolSettings(getContractAddress("stafiStakingPoolSettings"));
+        require(block.number.sub(statusBlock) >= stafiStakingPoolSettings.getNodeRefundWaitingPeriod(),
+            "The staking pool can only be refunded after waiting period"
+        );
         IStafiNetworkSettings stafiNetworkSettings = IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
         // Calculate node refund amount
         uint256 calcBase = 1 ether;

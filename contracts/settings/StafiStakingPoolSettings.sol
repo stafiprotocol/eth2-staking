@@ -21,6 +21,7 @@ contract StafiStakingPoolSettings is StafiBase, IStafiStakingPoolSettings {
         if (!getBoolS("settings.stakingpool.init")) {
             // Apply settings
             setLaunchTimeout(5760); // ~24 hours
+            setNodeRefundWaitingPeriod(172800); // ~30 days
             // Settings initialized
             setBoolS("settings.stakingpool.init", true);
         }
@@ -64,5 +65,13 @@ contract StafiStakingPoolSettings is StafiBase, IStafiStakingPoolSettings {
     }
     function setLaunchTimeout(uint256 _value) public onlySuperUser {
         setUintS("settings.stakingpool.launch.timeout", _value);
+    }
+
+    // Period in blocks for staking pools to refund
+    function getNodeRefundWaitingPeriod() override public view returns (uint256) {
+        return getUintS("settings.stakingpool.refund.period");
+    }
+    function setNodeRefundWaitingPeriod(uint256 _value) public onlySuperUser {
+        setUintS("settings.stakingpool.refund.period", _value);
     }
 }

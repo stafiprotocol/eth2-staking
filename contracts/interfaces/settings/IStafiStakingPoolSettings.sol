@@ -13,4 +13,5 @@ interface IStafiStakingPoolSettings {
     function getSixteenDepositNodeAmount() external view returns (uint256);
     function getDepositUserAmount(DepositType _depositType) external view returns (uint256);
     function getLaunchTimeout() external view returns (uint256);
+    function getNodeRefundWaitingPeriod() external view returns (uint256);
 }
