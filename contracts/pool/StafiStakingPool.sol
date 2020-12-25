@@ -35,8 +35,11 @@ contract StafiStakingPool is IStafiStakingPool {
     address private nodeAddress;
     uint256 private nodeFee;
     uint256 private nodeDepositBalance;
-    uint256 private nodeRefundBalance;
     bool private nodeDepositAssigned;
+
+    uint256 private nodeRefundBalance;
+    bool private nodeCommonlyRefunded;
+    bool private nodeTrustedRefunded;
 
     // User deposit details
     uint256 private userDepositBalance;
@@ -46,13 +49,10 @@ contract StafiStakingPool is IStafiStakingPool {
     // Platform details
     uint256 private platformDepositBalance;
 
-    // Staking details
-    uint256 private stakingStartBalance;
-    uint256 private stakingEndBalance;
-
     // Events
     event StatusUpdated(uint8 indexed status, uint256 time);
     event EtherDeposited(address indexed from, uint256 amount, uint256 time);
+    event EtherRefunded(address indexed from, uint256 amount, uint256 time);
     event EtherWithdrawn(address indexed to, uint256 amount, uint256 time);
 
     // Status getters
@@ -67,8 +67,10 @@ contract StafiStakingPool is IStafiStakingPool {
     function getNodeAddress() override public view returns (address) { return nodeAddress; }
     function getNodeFee() override public view returns (uint256) { return nodeFee; }
     function getNodeDepositBalance() override public view returns (uint256) { return nodeDepositBalance; }
-    function getNodeRefundBalance() override public view returns (uint256) { return nodeRefundBalance; }
     function getNodeDepositAssigned() override public view returns (bool) { return nodeDepositAssigned; }
+    function getNodeRefundBalance() override public view returns (uint256) { return nodeRefundBalance; }
+    function getNodeCommonlyRefunded() override public view returns (bool) { return nodeCommonlyRefunded; }
+    function getNodeTrustedRefunded() override public view returns (bool) { return nodeTrustedRefunded; }
 
     // User deposit detail getters
     function getUserDepositBalance() override public view returns (uint256) { return userDepositBalance; }
@@ -77,10 +79,6 @@ contract StafiStakingPool is IStafiStakingPool {
 
     // Platform detail getters
     function getPlatformDepositBalance() override public view returns (uint256) { return platformDepositBalance; }
-
-    // Staking detail getters
-    function getStakingStartBalance() override public view returns (uint256) { return stakingStartBalance; }
-    function getStakingEndBalance() override public view returns (uint256) { return stakingEndBalance; }
 
     // Construct
     constructor(address _stafiStorageAddress, address _nodeAddress, DepositType _depositType) public {
@@ -181,29 +179,34 @@ contract StafiStakingPool is IStafiStakingPool {
     // Only accepts calls from the staking pool owner (node)
     function refund() override external onlyStakingPoolOwner(msg.sender) {
         // Check current status
-        require(status == StakingPoolStatus.Staking, "The stakingpool can only be refunded while staking");
-        require(nodeRefundBalance == 0, "The stakingpool has already been refunded");
-        // Check if being dissolved by staking pool owner or staking pool is timed out
+        require(status == StakingPoolStatus.Staking, "The staking pool can only be refunded while staking");
+        require(!nodeTrustedRefunded, "The staking pool has already been refunded");
+        // Load contracts
         IStafiStakingPoolSettings stafiStakingPoolSettings = IStafiStakingPoolSettings(getContractAddress("stafiStakingPoolSettings"));
-        require(block.number.sub(statusBlock) >= stafiStakingPoolSettings.getNodeRefundWaitingPeriod(),
-            "The staking pool can only be refunded after waiting period"
-        );
         IStafiNetworkSettings stafiNetworkSettings = IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
-        // Calculate node refund amount
-        uint256 calcBase = 1 ether;
-        nodeRefundBalance = nodeDepositBalance.mul(stafiNetworkSettings.getNodeRefundRatio()).div(calcBase);
-        platformDepositBalance = nodeRefundBalance;
-        nodeDepositBalance = nodeDepositBalance.sub(nodeRefundBalance);
-    }
 
-    function setWithdrawn(uint256 _stakingStartBalance, uint256 _stakingEndBalance) override external onlyLatestContract("stafiNetworkWithdrawal", msg.sender) {
-        // Check current status
-        require(status == StakingPoolStatus.Staking, "The stakingpool can only become withdrawn while staking");
-        // Set staking details
-        stakingStartBalance = _stakingStartBalance;
-        stakingEndBalance = _stakingEndBalance;
-        // Progress to withdrawable
-        setStatus(StakingPoolStatus.Withdrawn);
+        address poolAddress = address(this);
+        uint256 calcBase = 1 ether;
+        if (stafiStakingPoolSettings.getStakingPoolTrustedRefundedEnabled(poolAddress)) {
+            uint256 totalNodeDepositBalance = nodeDepositBalance;
+            if (nodeCommonlyRefunded) {
+                totalNodeDepositBalance = nodeDepositBalance.add(nodeRefundBalance);
+            }
+            nodeRefundBalance = totalNodeDepositBalance.mul(stafiNetworkSettings.getNodeTrustedRefundRatio()).div(calcBase);
+            platformDepositBalance = nodeRefundBalance;
+            nodeDepositBalance = totalNodeDepositBalance.sub(nodeRefundBalance);
+            nodeTrustedRefunded = true;
+        } else {
+            require(!nodeCommonlyRefunded, "The staking pool has already been refunded commonly");
+            require(stafiStakingPoolSettings.getStakingPoolRefundedEnabled(poolAddress), "The staking pool can only be refunded after being enabled");
+
+            nodeRefundBalance = nodeDepositBalance.mul(stafiNetworkSettings.getNodeRefundRatio()).div(calcBase);
+            platformDepositBalance = nodeRefundBalance;
+            nodeDepositBalance = nodeDepositBalance.sub(nodeRefundBalance);
+            nodeCommonlyRefunded = true;   
+        }
+        // Emit ether refunded event
+        emit EtherRefunded(msg.sender, nodeRefundBalance, now);
     }
 
     // Dissolve the staking pool, returning user deposited ETH to the deposit pool

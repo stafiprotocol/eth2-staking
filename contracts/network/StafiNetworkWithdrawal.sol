@@ -93,8 +93,6 @@ contract StafiNetworkWithdrawal is StafiBase, IStafiNetworkWithdrawal {
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
         IStafiStakingPool stakingPool = IStafiStakingPool(_stakingPoolAddress);
 
-        stakingPool.setWithdrawn(_stakingStartBalance, _stakingEndBalance);
-
         uint256 nodeAmount = getStakingPoolNodeRewardAmount(
             stafiNetworkSettings.getPlatformFee(),
             stafiNetworkSettings.getNodeFee(),

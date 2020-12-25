@@ -21,6 +21,7 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
             setNodeFee(0.1 ether); // 10%
             setPlatformFee(0.1 ether); // 10%
             setNodeRefundRatio(0.25 ether); // 25%
+            setNodeTrustedRefundRatio(0.5 ether); // 50%
             // Settings initialized
             setBoolS("settings.network.init", true);
         }
@@ -72,6 +73,14 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
     }
     function setNodeRefundRatio(uint256 _value) public onlySuperUser {
         setUintS("settings.network.node.refund.ratio", _value);
+    }
+
+    // The trusted node refund commission rate as a fraction of 1 ether
+    function getNodeTrustedRefundRatio() override public view returns (uint256) {
+        return getUintS("settings.network.node.trusted.refund.ratio");
+    }
+    function setNodeTrustedRefundRatio(uint256 _value) public onlySuperUser {
+        setUintS("settings.network.node.trusted.refund.ratio", _value);
     }
 
     // Get the validator withdrawal credentials

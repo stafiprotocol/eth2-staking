@@ -20,8 +20,7 @@ contract StafiStakingPoolSettings is StafiBase, IStafiStakingPoolSettings {
         // Initialize settings on deployment
         if (!getBoolS("settings.stakingpool.init")) {
             // Apply settings
-            setLaunchTimeout(5760); // ~24 hours
-            setNodeRefundWaitingPeriod(172800); // ~30 days
+            setLaunchTimeout(17280); // ~72 hours
             // Settings initialized
             setBoolS("settings.stakingpool.init", true);
         }
@@ -67,11 +66,25 @@ contract StafiStakingPoolSettings is StafiBase, IStafiStakingPoolSettings {
         setUintS("settings.stakingpool.launch.timeout", _value);
     }
 
-    // Period in blocks for staking pools to refund
-    function getNodeRefundWaitingPeriod() override public view returns (uint256) {
-        return getUintS("settings.stakingpool.refund.period");
+    // Submit staking pool refund currently enabled
+    function getStakingPoolRefundedEnabled(address _stakingPoolAddress) override public view returns (bool) {
+        return getBool(keccak256(abi.encodePacked("settings.stakingpool.refund.enabled", _stakingPoolAddress)));
     }
-    function setNodeRefundWaitingPeriod(uint256 _value) public onlySuperUser {
-        setUintS("settings.stakingpool.refund.period", _value);
+    function setStakingPoolRefundedEnabled(address _stakingPoolAddress, bool _value) public onlySuperUser {
+        // Check current node status
+        require(getBool(keccak256(abi.encodePacked("settings.stakingpool.refund.enabled", _stakingPoolAddress))) != _value, "The node's refunded status is already set");
+        // Set status
+        setBool(keccak256(abi.encodePacked("settings.stakingpool.refund.enabled", _stakingPoolAddress)), _value);
+    }
+
+    // Submit staking pool refund currently enabled
+    function getStakingPoolTrustedRefundedEnabled(address _stakingPoolAddress) override public view returns (bool) {
+        return getBool(keccak256(abi.encodePacked("settings.stakingpool.trusted.refund.enabled", _stakingPoolAddress)));
+    }
+    function setStakingPoolTrustedRefundedEnabled(address _stakingPoolAddress, bool _value) public onlySuperUser {
+        // Check current node status
+        require(getBool(keccak256(abi.encodePacked("settings.stakingpool.trusted.refund.enabled", _stakingPoolAddress))) != _value, "The node's refunded status is already set");
+        // Set status
+        setBool(keccak256(abi.encodePacked("settings.stakingpool.trusted.refund.enabled", _stakingPoolAddress)), _value);
     }
 }
