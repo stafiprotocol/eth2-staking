@@ -27,7 +27,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
     constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {
         version = 1;
         // Initialize settings on deployment
-        if (!getBoolS("settings.deposit.init")) {
+        if (!getBoolS("settings.user.deposit.init")) {
             // Apply settings
             setDepositEnabled(true);
             setAssignDepositsEnabled(true);
@@ -35,7 +35,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
             // setMaximumDepositPoolSize(100000 ether);
             setMaximumDepositAssignments(2);
             // Settings initialized
-            setBoolS("settings.deposit.init", true);
+            setBoolS("settings.user.deposit.init", true);
         }
     }
 

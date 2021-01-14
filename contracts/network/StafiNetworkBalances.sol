@@ -90,7 +90,7 @@ contract StafiNetworkBalances is StafiBase, IStafiNetworkBalances {
         // Check submission count & update network balances
         uint256 calcBase = 1 ether;
         IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
-        if (calcBase.mul(submissionCount).div(stafiNodeManager.getTrustedNodeCount()) >= stafiNetworkSettings.getNodeConsensusThreshold()) {
+        if (calcBase.mul(submissionCount) >= stafiNodeManager.getTrustedNodeCount().mul(stafiNetworkSettings.getNodeConsensusThreshold())) {
             updateBalances(_block, _totalEth, _stakingEth, _rethSupply);
         }
     }

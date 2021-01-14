@@ -78,7 +78,7 @@ contract StafiNetworkWithdrawal is StafiBase, IStafiNetworkWithdrawal {
         // Check submission count & set stakingpool withdrawable
         uint256 calcBase = 1 ether;
         IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
-        if (calcBase.mul(submissionCount).div(stafiNodeManager.getTrustedNodeCount()) >= stafiNetworkSettings.getNodeConsensusThreshold()) {
+        if (calcBase.mul(submissionCount) >= stafiNodeManager.getTrustedNodeCount().mul(stafiNetworkSettings.getNodeConsensusThreshold())) {
             processWithdrawal(_stakingPoolAddress, _stakingStartBalance, _stakingEndBalance);
         }
     }

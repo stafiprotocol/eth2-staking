@@ -77,6 +77,11 @@ contract StafiUpgrade is StafiBase, IStafiUpgrade {
     function addStafiUpgradeContract(address _contractAddress) private {
         string memory name = "stafiUpgrade";
         bytes32 nameHash = keccak256(abi.encodePacked(name));
+        address oldContractAddress = getAddress(keccak256(abi.encodePacked("contract.address", name)));
+        if (oldContractAddress != address(0x0)) {
+            deleteBool(keccak256(abi.encodePacked("contract.exists", oldContractAddress)));
+            deleteString(keccak256(abi.encodePacked("contract.name", oldContractAddress)));
+        }
         setBool(keccak256(abi.encodePacked("contract.exists", _contractAddress)), true);
         setString(keccak256(abi.encodePacked("contract.name", _contractAddress)), name);
         setAddress(keccak256(abi.encodePacked("contract.address", name)), _contractAddress);

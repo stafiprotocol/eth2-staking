@@ -13,7 +13,7 @@ contract AddressQueueStorage is StafiBase, IAddressQueueStorage {
     using SafeMath for uint256;
 
     // Settings
-    uint256 public capacity = 2 ** 255; // max uint256 / 2
+    uint256 public constant capacity = 2 ** 255; // max uint256 / 2
 
     // Construct
     constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {

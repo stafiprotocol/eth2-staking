@@ -21,12 +21,12 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
     constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {
         version = 1;
          // Initialize settings on deployment
-        if (!getBoolS("settings.node.init")) {
+        if (!getBoolS("settings.node.deposit.init")) {
             // Apply settings
             setDepositEnabled(true);
             setCurrentNodeDepositAmount(8 ether);
             // Settings initialized
-            setBoolS("settings.node.init", true);
+            setBoolS("settings.node.deposit.init", true);
         }
     }
 

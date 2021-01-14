@@ -56,6 +56,7 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
         return getUintS("settings.network.node.fee");
     }
     function setNodeFee(uint256 _value) public onlySuperUser {
+        require( _value <= 1 ether, "Invalid value");
         setUintS("settings.network.node.fee", _value);
     }
 
@@ -64,6 +65,7 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
         return getUintS("settings.network.platform.fee");
     }
     function setPlatformFee(uint256 _value) public onlySuperUser {
+        require( _value <= 1 ether, "Invalid value");
         setUintS("settings.network.platform.fee", _value);
     }
 
@@ -72,6 +74,7 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
         return getUintS("settings.network.node.refund.ratio");
     }
     function setNodeRefundRatio(uint256 _value) public onlySuperUser {
+        require( _value <= 1 ether, "Invalid value");
         setUintS("settings.network.node.refund.ratio", _value);
     }
 
@@ -80,6 +83,7 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
         return getUintS("settings.network.node.trusted.refund.ratio");
     }
     function setNodeTrustedRefundRatio(uint256 _value) public onlySuperUser {
+        require( _value <= 1 ether, "Invalid value");
         setUintS("settings.network.node.trusted.refund.ratio", _value);
     }
 
