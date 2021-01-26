@@ -52,7 +52,7 @@ contract StafiStakingPool is IStafiStakingPool {
     // Events
     event StatusUpdated(uint8 indexed status, uint256 time);
     event EtherDeposited(address indexed from, uint256 amount, uint256 time);
-    event EtherRefunded(address indexed from, uint256 amount, uint256 time);
+    event EtherRefunded(address indexed node, address indexed stakingPool, uint256 amount, uint256 time);
     event EtherWithdrawn(address indexed to, uint256 amount, uint256 time);
 
     // Status getters
@@ -206,7 +206,7 @@ contract StafiStakingPool is IStafiStakingPool {
             nodeCommonlyRefunded = true;   
         }
         // Emit ether refunded event
-        emit EtherRefunded(msg.sender, nodeRefundBalance, now);
+        emit EtherRefunded(msg.sender, poolAddress, nodeRefundBalance, now);
     }
 
     // Dissolve the staking pool, returning user deposited ETH to the deposit pool
