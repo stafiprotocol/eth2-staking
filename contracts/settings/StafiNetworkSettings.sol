@@ -15,7 +15,7 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
         // Initialize settings on deployment
         if (!getBoolS("settings.network.init")) {
             // Apply settings
-            setNodeConsensusThreshold(0.51 ether); // 51%
+            setNodeConsensusThreshold(0.5 ether); // 50%
             setSubmitBalancesEnabled(true);
             setProcessWithdrawalsEnabled(true);
             setNodeFee(0.1 ether); // 10%

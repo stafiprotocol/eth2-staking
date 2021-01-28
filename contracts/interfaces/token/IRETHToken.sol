@@ -10,6 +10,6 @@ interface IRETHToken {
     function getCollateralRate() external view returns (uint256);
     function depositRewards() external payable;
     function depositExcess() external payable;
-    function mint(uint256 _ethAmount, address _to) external;
-    function burn(uint256 _rethAmount) external;
+    function userMint(uint256 _ethAmount, address _to) external;
+    function userBurn(uint256 _rethAmount) external;
 }

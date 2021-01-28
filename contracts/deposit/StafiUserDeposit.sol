@@ -69,7 +69,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         // Load contracts
         IRETHToken rETHToken = IRETHToken(getContractAddress("rETHToken"));
         // Mint rETH to user account
-        rETHToken.mint(msg.value, msg.sender);
+        rETHToken.userMint(msg.value, msg.sender);
         // Emit deposit received event
         emit DepositReceived(msg.sender, msg.value, now);
         // Process deposit

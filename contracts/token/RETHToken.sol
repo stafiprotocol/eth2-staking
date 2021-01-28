@@ -2,7 +2,7 @@ pragma solidity 0.6.12;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/presets/ERC20PresetMinterPauser.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../StafiBase.sol";
 import "../interfaces/token/IRETHToken.sol";
@@ -10,7 +10,7 @@ import "../interfaces/network/IStafiNetworkBalances.sol";
 import "../interfaces/deposit/IStafiUserDeposit.sol";
 
 // rETH is backed by ETH (subject to liquidity) at a variable exchange rate
-contract RETHToken is StafiBase, ERC20, IRETHToken {
+contract RETHToken is StafiBase, ERC20PresetMinterPauser, IRETHToken {
 
     // Libs
     using SafeMath for uint256;
@@ -21,9 +21,12 @@ contract RETHToken is StafiBase, ERC20, IRETHToken {
     event TokensBurned(address indexed from, uint256 amount, uint256 ethAmount, uint256 time);
 
     // Construct
-    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) ERC20("StaFi", "rETH") public {
+    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) ERC20PresetMinterPauser("StaFi", "rETH") public {
         version = 1;
-        setBurnEnabled(false);
+        // Migrate from the old contract to the new contract
+        _mint(address(0xB61959B37AADFF714Af150580559858483459b8E), 24132334000000000000);
+        _mint(address(0xa7DeBb68F2684074Ec4354B68E36C34AF363Fd57), 1500000000000000000);
+        _mint(address(0xBABf7e6b5bcE0BD749FD3C527374bEf8919cC7A9), 10000000000000000);
     }
 
     // Calculate the amount of ETH backing an amount of rETH
@@ -90,7 +93,7 @@ contract RETHToken is StafiBase, ERC20, IRETHToken {
 
     // Mint rETH
     // Only accepts calls from the StafiUserDeposit contract
-    function mint(uint256 _ethAmount, address _to) override external onlyLatestContract("stafiUserDeposit", msg.sender) {
+    function userMint(uint256 _ethAmount, address _to) override external onlyLatestContract("stafiUserDeposit", msg.sender) {
         // Get rETH amount
         uint256 rethAmount = getRethValue(_ethAmount);
         // Check rETH amount
@@ -103,7 +106,7 @@ contract RETHToken is StafiBase, ERC20, IRETHToken {
     }
 
     // Burn rETH for ETH
-    function burn(uint256 _rethAmount) override external {
+    function userBurn(uint256 _rethAmount) override external {
         // Check deposit settings
         require(getBurnEnabled(), "Burn is currently disabled");
         // Check rETH amount
