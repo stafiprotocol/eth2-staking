@@ -36,6 +36,8 @@ contract StafiStakingPoolQueue is StafiBase, IStafiStakingPoolQueue {
             getLength(DepositType.TWELVE)
         ).add(
             getLength(DepositType.SIXTEEN)
+        ).add(
+            getLength(DepositType.Empty)
         );
     }
 
@@ -46,6 +48,7 @@ contract StafiStakingPoolQueue is StafiBase, IStafiStakingPoolQueue {
         if (_depositType == DepositType.EIGHT) { return getLength("stakingpools.available.eight"); }
         if (_depositType == DepositType.TWELVE) { return getLength("stakingpools.available.twelve"); }
         if (_depositType == DepositType.SIXTEEN) { return getLength("stakingpools.available.sixteen"); }
+        if (_depositType == DepositType.Empty) { return getLength("stakingpools.available.empty"); }
         return 0;
     }
     function getLength(string memory _queueId) private view returns (uint256) {
@@ -64,6 +67,8 @@ contract StafiStakingPoolQueue is StafiBase, IStafiStakingPoolQueue {
             getLength(DepositType.TWELVE).mul(stafiStakingPoolSettings.getDepositUserAmount(DepositType.TWELVE))
         ).add(
             getLength(DepositType.SIXTEEN).mul(stafiStakingPoolSettings.getDepositUserAmount(DepositType.SIXTEEN))
+        ).add(
+            getLength(DepositType.Empty).mul(stafiStakingPoolSettings.getDepositUserAmount(DepositType.Empty))
         );
     }
 
@@ -89,6 +94,7 @@ contract StafiStakingPoolQueue is StafiBase, IStafiStakingPoolQueue {
         if (getLength(DepositType.EIGHT) > 0) { return stafiStakingPoolSettings.getDepositUserAmount(DepositType.EIGHT); }
         if (getLength(DepositType.TWELVE) > 0) { return stafiStakingPoolSettings.getDepositUserAmount(DepositType.TWELVE); }
         if (getLength(DepositType.SIXTEEN) > 0) { return stafiStakingPoolSettings.getDepositUserAmount(DepositType.SIXTEEN); }
+        if (getLength(DepositType.Empty) > 0) { return stafiStakingPoolSettings.getDepositUserAmount(DepositType.Empty); }
         return 0;
     }
 
@@ -99,6 +105,7 @@ contract StafiStakingPoolQueue is StafiBase, IStafiStakingPoolQueue {
         if (_depositType == DepositType.EIGHT) { return enqueueStakingPool("stakingpools.available.eight", _stakingPool); }
         if (_depositType == DepositType.TWELVE) { return enqueueStakingPool("stakingpools.available.twelve", _stakingPool); }
         if (_depositType == DepositType.SIXTEEN) { return enqueueStakingPool("stakingpools.available.sixteen", _stakingPool); }
+        if (_depositType == DepositType.Empty) { return enqueueStakingPool("stakingpools.available.empty", _stakingPool); }
         require(false, "Invalid staking pool deposit type");
     }
     function enqueueStakingPool(string memory _queueId, address _stakingPool) private {
@@ -116,6 +123,7 @@ contract StafiStakingPoolQueue is StafiBase, IStafiStakingPoolQueue {
         if (getLength(DepositType.EIGHT) > 0) { return dequeueStakingPool("stakingpools.available.eight"); }
         if (getLength(DepositType.TWELVE) > 0) { return dequeueStakingPool("stakingpools.available.twelve"); }
         if (getLength(DepositType.SIXTEEN) > 0) { return dequeueStakingPool("stakingpools.available.sixteen"); }
+        if (getLength(DepositType.Empty) > 0) { return dequeueStakingPool("stakingpools.available.empty"); }
         require(false, "No stakingpools are available");
     }
     function dequeueStakingPool(string memory _queueId) private returns (address) {
@@ -139,6 +147,7 @@ contract StafiStakingPoolQueue is StafiBase, IStafiStakingPoolQueue {
         if (depositType == DepositType.EIGHT) { return removeStakingPool("stakingpools.available.eight", msg.sender); }
         if (depositType == DepositType.TWELVE) { return removeStakingPool("stakingpools.available.twelve", msg.sender); }
         if (depositType == DepositType.SIXTEEN) { return removeStakingPool("stakingpools.available.sixteen", msg.sender); }
+        if (depositType == DepositType.Empty) { return removeStakingPool("stakingpools.available.empty", msg.sender); }
         require(false, "Invalid deposit type");
     }
     function removeStakingPool(string memory _queueId, address _stakingPool) private {

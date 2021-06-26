@@ -24,7 +24,7 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
         if (!getBoolS("settings.node.deposit.init")) {
             // Apply settings
             setDepositEnabled(true);
-            setCurrentNodeDepositAmount(8 ether);
+            setCurrentNodeDepositAmount(4 ether);
             // Settings initialized
             setBoolS("settings.node.deposit.init", true);
         }
@@ -34,7 +34,7 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
     function deposit() override external payable onlyLatestContract("stafiNodeDeposit", address(this)) {
         // Check node settings
         require(getDepositEnabled(), "Node deposits are currently disabled");
-        require(msg.value == getCurrentNodeDepositAmount(), "Invalid node deposit amount");
+        require(msg.value == 0 || msg.value == getCurrentNodeDepositAmount(), "Invalid node deposit amount");
         // Load contracts
         IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
         IStafiStakingPoolManager stafiStakingPoolManager = IStafiStakingPoolManager(getContractAddress("stafiStakingPoolManager"));
@@ -45,12 +45,16 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
         else if (msg.value == stafiStakingPoolSettings.getEightDepositNodeAmount()) { depositType = DepositType.EIGHT; }
         else if (msg.value == stafiStakingPoolSettings.getTwelveDepositNodeAmount()) { depositType = DepositType.TWELVE; }
         else if (msg.value == stafiStakingPoolSettings.getSixteenDepositNodeAmount()) { depositType = DepositType.SIXTEEN; }
+
+        IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
+        if (depositType == DepositType.None && stafiNodeManager.getNodeTrusted(msg.sender)) {
+            depositType = DepositType.Empty;
+        }
         // Check deposit type
         require(depositType != DepositType.None, "Invalid node deposit amount");
         // Emit deposit received event
         emit DepositReceived(msg.sender, msg.value, now);
         // Register the node
-        IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
         stafiNodeManager.registerNode(msg.sender);
         // Create staking pool
         address stakingPoolAddress = stafiStakingPoolManager.createStakingPool(msg.sender, depositType);

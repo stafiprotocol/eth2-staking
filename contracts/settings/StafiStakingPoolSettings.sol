@@ -37,6 +37,7 @@ contract StafiStakingPoolSettings is StafiBase, IStafiStakingPoolSettings {
         if (_depositType == DepositType.EIGHT) { return getEightDepositNodeAmount(); }
         if (_depositType == DepositType.TWELVE) { return getTwelveDepositNodeAmount(); }
         if (_depositType == DepositType.SIXTEEN) { return getSixteenDepositNodeAmount(); }
+        if (_depositType == DepositType.Empty) { return 0 ether; }
         return 0;
     }
     function getFourDepositNodeAmount() override public view returns (uint256) {
