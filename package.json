@@ -10,5 +10,8 @@
   "license": "GPL-3.0-only",
   "devDependencies": {
     "@openzeppelin/contracts": "^3.2.0"
+  },
+  "dependencies": {
+    "truffle-contract-size": "^2.0.1"
   }
 }

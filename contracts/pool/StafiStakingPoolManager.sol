@@ -22,40 +22,38 @@ contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
         version = 1;
     }
 
+    function AddressSetStorage() public view returns (IAddressSetStorage) {
+        return IAddressSetStorage(getContractAddress("addressSetStorage"));
+    }
+
     // Get the number of staking pools in the network
     function getStakingPoolCount() override public view returns (uint256) {
-        IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
-        return addressSetStorage.getCount(keccak256(abi.encodePacked("stakingpools.index")));
+        return AddressSetStorage().getCount(keccak256(abi.encodePacked("stakingpools.index")));
     }
 
     // Get a network staking pool address by index
     function getStakingPoolAt(uint256 _index) override public view returns (address) {
-        IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
-        return addressSetStorage.getItem(keccak256(abi.encodePacked("stakingpools.index")), _index);
+        return AddressSetStorage().getItem(keccak256(abi.encodePacked("stakingpools.index")), _index);
     }
 
     // Get the number of staking pools owned by a node
     function getNodeStakingPoolCount(address _nodeAddress) override public view returns (uint256) {
-        IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
-        return addressSetStorage.getCount(keccak256(abi.encodePacked("node.stakingpools.index", _nodeAddress)));
+        return AddressSetStorage().getCount(keccak256(abi.encodePacked("node.stakingpools.index", _nodeAddress)));
     }
 
     // Get a node staking pool address by index
     function getNodeStakingPoolAt(address _nodeAddress, uint256 _index) override public view returns (address) {
-        IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
-        return addressSetStorage.getItem(keccak256(abi.encodePacked("node.stakingpools.index", _nodeAddress)), _index);
+        return AddressSetStorage().getItem(keccak256(abi.encodePacked("node.stakingpools.index", _nodeAddress)), _index);
     }
 
     // Get the number of validating staking pools owned by a node
     function getNodeValidatingStakingPoolCount(address _nodeAddress) override public view returns (uint256) {
-        IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
-        return addressSetStorage.getCount(keccak256(abi.encodePacked("node.stakingpools.validating.index", _nodeAddress)));
+        return AddressSetStorage().getCount(keccak256(abi.encodePacked("node.stakingpools.validating.index", _nodeAddress)));
     }
 
     // Get a validating node staking pool address by index
     function getNodeValidatingStakingPoolAt(address _nodeAddress, uint256 _index) override public view returns (address) {
-        IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
-        return addressSetStorage.getItem(keccak256(abi.encodePacked("node.stakingpools.validating.index", _nodeAddress)), _index);
+        return AddressSetStorage().getItem(keccak256(abi.encodePacked("node.stakingpools.validating.index", _nodeAddress)), _index);
     }
 
     // Get a staking pool address by validator pubkey
@@ -82,14 +80,13 @@ contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
     // Only accepts calls from the StafiNodeDeposit contract
     function createStakingPool(address _nodeAddress, DepositType _depositType) override external onlyLatestContract("stafiStakingPoolManager", address(this)) onlyLatestContract("stafiNodeDeposit", msg.sender) returns (address) {
         IStafiStakingPoolQueue stafiStakingPoolQueue = IStafiStakingPoolQueue(getContractAddress("stafiStakingPoolQueue"));
-        IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
         // Create staking pool contract
         address contractAddress = address(new StafiStakingPool(address(stafiStorage), _nodeAddress, _depositType));
         // Initialize staking pool data
         setBool(keccak256(abi.encodePacked("stakingpool.exists", contractAddress)), true);
         // Add staking pool to indexes
-        addressSetStorage.addItem(keccak256(abi.encodePacked("stakingpools.index")), contractAddress);
-        addressSetStorage.addItem(keccak256(abi.encodePacked("node.stakingpools.index", _nodeAddress)), contractAddress);
+        AddressSetStorage().addItem(keccak256(abi.encodePacked("stakingpools.index")), contractAddress);
+        AddressSetStorage().addItem(keccak256(abi.encodePacked("node.stakingpools.index", _nodeAddress)), contractAddress);
         // Emit staking pool created event
         emit StakingPoolCreated(contractAddress, _nodeAddress, now);
         // Add staking pool to queue
@@ -101,16 +98,14 @@ contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
     // Destroy a staking pool
     // Only accepts calls from registered stakingpools
     function destroyStakingPool() override external onlyLatestContract("stafiStakingPoolManager", address(this)) onlyRegisteredStakingPool(msg.sender) {
-        // Load contracts
-        IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
         // Initialize staking pool & get properties
         IStafiStakingPool stakingPool = IStafiStakingPool(msg.sender);
         address nodeAddress = stakingPool.getNodeAddress();
         // Update staking pool data
         setBool(keccak256(abi.encodePacked("stakingpool.exists", msg.sender)), false);
         // Remove staking pool from indexes
-        addressSetStorage.removeItem(keccak256(abi.encodePacked("stakingpools.index")), msg.sender);
-        addressSetStorage.removeItem(keccak256(abi.encodePacked("node.stakingpools.index", nodeAddress)), msg.sender);
+        AddressSetStorage().removeItem(keccak256(abi.encodePacked("stakingpools.index")), msg.sender);
+        AddressSetStorage().removeItem(keccak256(abi.encodePacked("node.stakingpools.index", nodeAddress)), msg.sender);
         // Emit staking pool destroyed event
         emit StakingPoolDestroyed(msg.sender, nodeAddress, now);
     }
@@ -118,8 +113,6 @@ contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
     // Set a staking pool's validator pubkey
     // Only accepts calls from registered stakingpools
     function setStakingPoolPubkey(bytes calldata _pubkey) override external onlyLatestContract("stafiStakingPoolManager", address(this)) onlyRegisteredStakingPool(msg.sender) {
-        // Load contracts
-        IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
         // Initialize staking pool & get properties
         IStafiStakingPool stakingPool = IStafiStakingPool(msg.sender);
         address nodeAddress = stakingPool.getNodeAddress();
@@ -127,7 +120,7 @@ contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
         setBytes(keccak256(abi.encodePacked("stakingpool.pubkey", msg.sender)), _pubkey);
         setAddress(keccak256(abi.encodePacked("validator.stakingpool", _pubkey)), msg.sender);
         // Add staking pool to node validating stakingpools index
-        addressSetStorage.addItem(keccak256(abi.encodePacked("node.stakingpools.validating.index", nodeAddress)), msg.sender);
+        AddressSetStorage().addItem(keccak256(abi.encodePacked("node.stakingpools.validating.index", nodeAddress)), msg.sender);
     }
 
     // Set a staking pool's withdrawal processed status

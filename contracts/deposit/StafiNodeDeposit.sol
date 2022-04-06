@@ -31,7 +31,7 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
     }
 
     // Accept a node deposit and create a new staking pool under the node
-    function deposit() override external payable onlyLatestContract("stafiNodeDeposit", address(this)) {
+    function deposit(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) override external payable onlyLatestContract("stafiNodeDeposit", address(this)) {
         // Check node settings
         require(getDepositEnabled(), "Node deposits are currently disabled");
         require(msg.value == 0 || msg.value == getCurrentNodeDepositAmount(), "Invalid node deposit amount");
@@ -57,10 +57,10 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
         // Register the node
         stafiNodeManager.registerNode(msg.sender);
         // Create staking pool
-        address stakingPoolAddress = stafiStakingPoolManager.createStakingPool(msg.sender, depositType);
-        IStafiStakingPool stakingPool = IStafiStakingPool(stakingPoolAddress);
+        // address stakingPoolAddress = stafiStakingPoolManager.createStakingPool(msg.sender, depositType);
+        IStafiStakingPool stakingPool = IStafiStakingPool(stafiStakingPoolManager.createStakingPool(msg.sender, depositType));
         // Transfer deposit to staking pool
-        stakingPool.nodeDeposit{value: msg.value}();
+        stakingPool.nodeDeposit{value: msg.value}(_validatorPubkey, _validatorSignature, _depositDataRoot);
         // Assign deposits if enabled
         stafiUserDeposit.assignDeposits();
     }

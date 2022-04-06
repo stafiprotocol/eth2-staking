@@ -78,6 +78,7 @@ module.exports = {
   mocha: {
     // timeout: 100000
   },
+  plugins: ["truffle-contract-size"],
 
   // Configure your compilers
   compilers: {

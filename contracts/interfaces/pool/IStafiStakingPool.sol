@@ -21,10 +21,11 @@ interface IStafiStakingPool {
     function getUserDepositAssigned() external view returns (bool);
     function getUserDepositAssignedTime() external view returns (uint256);
     function getPlatformDepositBalance() external view returns (uint256);
-    function nodeDeposit() external payable;
+    function nodeDeposit(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) external payable;
     function userDeposit() external payable;
-    function stake(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) external;
+    function stake(bytes calldata _validatorSignature, bytes32 _depositDataRoot) external;
     function refund() external;
     function dissolve() external;
     function close() external;
+    function voteWithdrawCredentials() external;
 }
