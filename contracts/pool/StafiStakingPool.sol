@@ -97,8 +97,7 @@ contract StafiStakingPool is IStafiStakingPool {
         depositType = _depositType;
         nodeAddress = _nodeAddress;
         // Get settings
-        IStafiNetworkSettings stafiNetworkSettings = IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
-        nodeFee = stafiNetworkSettings.getNodeFee();
+        nodeFee = StafiNetworkSettings().getNodeFee();
     }
 
     // Only allow access from the owning node address
@@ -132,6 +131,14 @@ contract StafiStakingPool is IStafiStakingPool {
         return IStafiStakingPoolManager(getContractAddress("stafiStakingPoolManager"));
     }
 
+    function StafiNetworkSettings() public view returns (IStafiNetworkSettings) {
+        return IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
+    }
+
+    function EthDeposit() public view returns (IDepositContract) {
+        return IDepositContract(getContractAddress("ethDeposit"));
+    }
+
     // Assign the node deposit to the staking pool
     // Only accepts calls from the StafiNodeDeposit contract
     function nodeDeposit(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) override external payable onlyLatestContract("stafiNodeDeposit", msg.sender) {
@@ -139,10 +146,9 @@ contract StafiStakingPool is IStafiStakingPool {
         require(status == StakingPoolStatus.Initialized, "status != initialized");
         require(!nodeDepositAssigned, "assigned error");
         // Load contracts
-        IStafiStakingPoolSettings stafiStakingPoolSettings = StafiStakingPoolSettings();
         IStafiStakingPoolManager stafiStakingPoolManager = StafiStakingPoolManager();
         // Check deposit amount
-        uint256 depositNodeAmount =  stafiStakingPoolSettings.getDepositNodeAmount(depositType);
+        uint256 depositNodeAmount =  StafiStakingPoolSettings().getDepositNodeAmount(depositType);
         require(msg.value == depositNodeAmount, "Ivl node deposit amount");
         // Update node deposit details
         nodeDepositBalance = msg.value;
@@ -166,10 +172,8 @@ contract StafiStakingPool is IStafiStakingPool {
         // The user deposit can only be assigned while initialized, in prelaunch, or staking
         require(status >= StakingPoolStatus.Initialized && status <= StakingPoolStatus.Staking, "status unmatch");
         require(!userDepositAssigned, "assigned");
-        // Load contracts
-        IStafiStakingPoolSettings stafiStakingPoolSettings = StafiStakingPoolSettings();
         // Check deposit amount
-        require(msg.value == stafiStakingPoolSettings.getDepositUserAmount(depositType), "Ivl user deposit amount");
+        require(msg.value == StafiStakingPoolSettings().getDepositUserAmount(depositType), "Ivl user deposit amount");
         // Update user deposit details
         userDepositBalance = msg.value;
         userDepositAssigned = true;
@@ -187,15 +191,11 @@ contract StafiStakingPool is IStafiStakingPool {
         require(status == StakingPoolStatus.Prelaunch, "status unmatch");
         // Check withdrawCredentials match
         require(withdrawalCredentialsMatch, "Ivl withdraw credentials");
-        // Load contracts
-        IDepositContract ethDeposit = IDepositContract(getContractAddress("ethDeposit"));
-        IStafiStakingPoolManager stafiStakingPoolManager = StafiStakingPoolManager();
-        IStafiNetworkSettings stafiNetworkSettings = IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
         // Check staking pool balance
         require(address(this).balance >= userDepositBalance, "Insufficient balance");
         // Send staking deposit to casper
-        ethDeposit.deposit{value: userDepositBalance}(stafiStakingPoolManager.getStakingPoolPubkey(address(this)),
-         stafiNetworkSettings.getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
+        EthDeposit().deposit{value: userDepositBalance}(StafiStakingPoolManager().getStakingPoolPubkey(address(this)),
+        StafiNetworkSettings().getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
         // Progress to staking
         setStatus(StakingPoolStatus.Staking);
     }
@@ -203,16 +203,12 @@ contract StafiStakingPool is IStafiStakingPool {
 
     // Stakes some ETH into the deposit contract to set withdrawal credentials to this contract
     function preStake(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) internal {
-        // Load contracts
-        IDepositContract ethDeposit = IDepositContract(getContractAddress("ethDeposit"));
-        IStafiNetworkSettings stafiNetworkSettings = IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
-
         // Check minipool balance
         require(address(this).balance >= nodeDepositBalance, "Insufficient balance");
         // Get withdrawal credentials
-        bytes memory withdrawalCredentials = stafiNetworkSettings.getWithdrawalCredentials();
+        bytes memory withdrawalCredentials = StafiNetworkSettings().getWithdrawalCredentials();
         // Send staking deposit to casper
-        ethDeposit.deposit{value : nodeDepositBalance}(_validatorPubkey, withdrawalCredentials, _validatorSignature, _depositDataRoot);
+        EthDeposit().deposit{value : nodeDepositBalance}(_validatorPubkey, withdrawalCredentials, _validatorSignature, _depositDataRoot);
         // Emit event
         emit MinipoolPrestaked(_validatorPubkey, _validatorSignature, _depositDataRoot, nodeDepositBalance, withdrawalCredentials, block.timestamp);
     }
@@ -220,8 +216,6 @@ contract StafiStakingPool is IStafiStakingPool {
     // Submit network balances for a block
     // Only accepts calls from trusted (oracle) nodes
     function voteWithdrawCredentials() override external onlyTrustedNode(msg.sender) {
-        // Check settings
-        IStafiNetworkSettings stafiNetworkSettings = IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
         // Get submission keys
         bytes32 nodeSubmissionKey = keccak256(abi.encodePacked("stafi.stakingpool.withdrawcredentials.vote", msg.sender, address(this)));
         bytes32 submissionCountKey = keccak256(abi.encodePacked("stafi.stakingpool.withdrawcredentials.vote.count", address(this)));
@@ -236,7 +230,7 @@ contract StafiStakingPool is IStafiStakingPool {
         // Check submission count & update network balances
         uint256 calcBase = 1 ether;
         IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
-        if (calcBase.mul(submissionCount) >= stafiNodeManager.getTrustedNodeCount().mul(stafiNetworkSettings.getNodeConsensusThreshold()) && !withdrawalCredentialsMatch) {
+        if (calcBase.mul(submissionCount) >= stafiNodeManager.getTrustedNodeCount().mul(StafiNetworkSettings().getNodeConsensusThreshold()) && !withdrawalCredentialsMatch) {
             withdrawalCredentialsMatch = true;
         }
     }
@@ -248,26 +242,23 @@ contract StafiStakingPool is IStafiStakingPool {
         // The staking pool can only be refunded while staking
         require(status == StakingPoolStatus.Staking, "status unmatch");
         require(!nodeTrustedRefunded, "already refunded");
-        // Load contracts
-        IStafiStakingPoolSettings stafiStakingPoolSettings = StafiStakingPoolSettings();
-        IStafiNetworkSettings stafiNetworkSettings = IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
 
         address poolAddress = address(this);
         uint256 calcBase = 1 ether;
-        if (stafiStakingPoolSettings.getStakingPoolTrustedRefundedEnabled(poolAddress)) {
+        if (StafiStakingPoolSettings().getStakingPoolTrustedRefundedEnabled(poolAddress)) {
             uint256 totalNodeDepositBalance = nodeDepositBalance;
             if (nodeCommonlyRefunded) {
                 totalNodeDepositBalance = nodeDepositBalance.add(nodeRefundBalance);
             }
-            nodeRefundBalance = totalNodeDepositBalance.mul(stafiNetworkSettings.getNodeTrustedRefundRatio()).div(calcBase);
+            nodeRefundBalance = totalNodeDepositBalance.mul(StafiNetworkSettings().getNodeTrustedRefundRatio()).div(calcBase);
             platformDepositBalance = nodeRefundBalance;
             nodeDepositBalance = totalNodeDepositBalance.sub(nodeRefundBalance);
             nodeTrustedRefunded = true;
         } else {
             require(!nodeCommonlyRefunded, "already refunded commonly");
-            require(stafiStakingPoolSettings.getStakingPoolRefundedEnabled(poolAddress), "refunded not enabled");
+            require(StafiStakingPoolSettings().getStakingPoolRefundedEnabled(poolAddress), "refunded not enabled");
 
-            nodeRefundBalance = nodeDepositBalance.mul(stafiNetworkSettings.getNodeRefundRatio()).div(calcBase);
+            nodeRefundBalance = nodeDepositBalance.mul(StafiNetworkSettings().getNodeRefundRatio()).div(calcBase);
             platformDepositBalance = nodeRefundBalance;
             nodeDepositBalance = nodeDepositBalance.sub(nodeRefundBalance);
             nodeCommonlyRefunded = true;   
@@ -284,16 +275,14 @@ contract StafiStakingPool is IStafiStakingPool {
         require(status == StakingPoolStatus.Initialized || status == StakingPoolStatus.Prelaunch, "status unmatch");
         // Load contracts
         IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
-        IStafiStakingPoolQueue stafiStakingPoolQueue = IStafiStakingPoolQueue(getContractAddress("stafiStakingPoolQueue"));
-        IStafiStakingPoolSettings stafiStakingPoolSettings = StafiStakingPoolSettings();
         // Check if being dissolved by staking pool owner or staking pool is timed out
         require(
             msg.sender == nodeAddress ||
-            (status == StakingPoolStatus.Prelaunch && block.number.sub(statusBlock) >= stafiStakingPoolSettings.getLaunchTimeout()),
+            (status == StakingPoolStatus.Prelaunch && block.number.sub(statusBlock) >= StafiStakingPoolSettings().getLaunchTimeout()),
             "must owner or timed out"
         );
         // Remove staking pool from queue
-        if (!userDepositAssigned) { stafiStakingPoolQueue.removeStakingPool(); }
+        if (!userDepositAssigned) { IStafiStakingPoolQueue(getContractAddress("stafiStakingPoolQueue")).removeStakingPool(); }
         // Transfer user balance to deposit pool
         if (userDepositBalance > 0) {
             // Transfer

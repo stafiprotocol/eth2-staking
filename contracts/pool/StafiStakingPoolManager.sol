@@ -99,8 +99,7 @@ contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
     // Only accepts calls from registered stakingpools
     function destroyStakingPool() override external onlyLatestContract("stafiStakingPoolManager", address(this)) onlyRegisteredStakingPool(msg.sender) {
         // Initialize staking pool & get properties
-        IStafiStakingPool stakingPool = IStafiStakingPool(msg.sender);
-        address nodeAddress = stakingPool.getNodeAddress();
+        address nodeAddress = IStafiStakingPool(msg.sender).getNodeAddress();
         // Update staking pool data
         setBool(keccak256(abi.encodePacked("stakingpool.exists", msg.sender)), false);
         // Remove staking pool from indexes
@@ -114,8 +113,7 @@ contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
     // Only accepts calls from registered stakingpools
     function setStakingPoolPubkey(bytes calldata _pubkey) override external onlyLatestContract("stafiStakingPoolManager", address(this)) onlyRegisteredStakingPool(msg.sender) {
         // Initialize staking pool & get properties
-        IStafiStakingPool stakingPool = IStafiStakingPool(msg.sender);
-        address nodeAddress = stakingPool.getNodeAddress();
+        address nodeAddress = IStafiStakingPool(msg.sender).getNodeAddress();
         // Set staking pool validator pubkey & validator staking pool address
         setBytes(keccak256(abi.encodePacked("stakingpool.pubkey", msg.sender)), _pubkey);
         setAddress(keccak256(abi.encodePacked("validator.stakingpool", _pubkey)), msg.sender);
