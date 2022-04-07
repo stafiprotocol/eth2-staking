@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -14,7 +14,7 @@ contract StafiStakingPoolSettings is StafiBase, IStafiStakingPoolSettings {
     using SafeMath for uint256;
 
     // Construct
-    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {
+    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         // Set version
         version = 1;
         // Initialize settings on deployment
@@ -27,12 +27,12 @@ contract StafiStakingPoolSettings is StafiBase, IStafiStakingPoolSettings {
     }
 
     // Balance required to launch staking pool
-    function getLaunchBalance() override public view returns (uint256) {
+    function getLaunchBalance() override public pure returns (uint256) {
         return 32 ether;
     }
 
     // Required node deposit amounts
-    function getDepositNodeAmount(DepositType _depositType) override public view returns (uint256) {
+    function getDepositNodeAmount(DepositType _depositType) override public pure returns (uint256) {
         if (_depositType == DepositType.FOUR) { return getFourDepositNodeAmount(); }
         if (_depositType == DepositType.EIGHT) { return getEightDepositNodeAmount(); }
         if (_depositType == DepositType.TWELVE) { return getTwelveDepositNodeAmount(); }
@@ -40,21 +40,21 @@ contract StafiStakingPoolSettings is StafiBase, IStafiStakingPoolSettings {
         if (_depositType == DepositType.Empty) { return 0 ether; }
         return 0;
     }
-    function getFourDepositNodeAmount() override public view returns (uint256) {
+    function getFourDepositNodeAmount() override public pure returns (uint256) {
         return 4 ether;
     }
-    function getEightDepositNodeAmount() override public view returns (uint256) {
+    function getEightDepositNodeAmount() override public pure returns (uint256) {
         return 8 ether;
     }
-    function getTwelveDepositNodeAmount() override public view returns (uint256) {
+    function getTwelveDepositNodeAmount() override public pure returns (uint256) {
         return 12 ether;
     }
-    function getSixteenDepositNodeAmount() override public view returns (uint256) {
+    function getSixteenDepositNodeAmount() override public pure returns (uint256) {
         return 16 ether;
     }
 
     // Required user deposit amounts
-    function getDepositUserAmount(DepositType _depositType) override public view returns (uint256) {
+    function getDepositUserAmount(DepositType _depositType) override public pure returns (uint256) {
         if (_depositType == DepositType.None) { return 0 ether; }
         return getLaunchBalance().sub(getDepositNodeAmount(_depositType));
     }

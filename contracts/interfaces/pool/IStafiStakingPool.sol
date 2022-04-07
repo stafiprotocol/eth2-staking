@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -6,6 +6,7 @@ import "../../types/DepositType.sol";
 import "../../types/StakingPoolStatus.sol";
 
 interface IStafiStakingPool {
+    function initialise(address _nodeAddress, DepositType _depositType) external;
     function getStatus() external view returns (StakingPoolStatus);
     function getStatusBlock() external view returns (uint256);
     function getStatusTime() external view returns (uint256);

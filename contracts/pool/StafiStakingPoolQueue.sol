@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -22,7 +22,7 @@ contract StafiStakingPoolQueue is StafiBase, IStafiStakingPoolQueue {
     event StakingPoolRemoved(address indexed stakingPool, bytes32 indexed queueId, uint256 time);
 
     // Construct
-    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {
+    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         version = 1;
     }
 
@@ -113,12 +113,12 @@ contract StafiStakingPoolQueue is StafiBase, IStafiStakingPoolQueue {
         IAddressQueueStorage addressQueueStorage = IAddressQueueStorage(getContractAddress("addressQueueStorage"));
         addressQueueStorage.enqueueItem(keccak256(abi.encodePacked(_queueId)), _stakingPool);
         // Emit enqueued event
-        emit StakingPoolEnqueued(_stakingPool, keccak256(abi.encodePacked(_queueId)), now);
+        emit StakingPoolEnqueued(_stakingPool, keccak256(abi.encodePacked(_queueId)), block.timestamp);
     }
 
     // Remove the first available staking pool from the highest priority queue and return its address
     // Only accepts calls from the StafiUserDeposit contract
-    function dequeueStakingPool() override external onlyLatestContract("stafiStakingPoolQueue", address(this)) onlyLatestContract("stafiUserDeposit", msg.sender) returns (address) {
+    function dequeueStakingPool() override external onlyLatestContract("stafiStakingPoolQueue", address(this)) onlyLatestContract("stafiUserDeposit", msg.sender) returns (address _address) {
         if (getLength(DepositType.FOUR) > 0) { return dequeueStakingPool("stakingpools.available.four"); }
         if (getLength(DepositType.EIGHT) > 0) { return dequeueStakingPool("stakingpools.available.eight"); }
         if (getLength(DepositType.TWELVE) > 0) { return dequeueStakingPool("stakingpools.available.twelve"); }
@@ -131,7 +131,7 @@ contract StafiStakingPoolQueue is StafiBase, IStafiStakingPoolQueue {
         IAddressQueueStorage addressQueueStorage = IAddressQueueStorage(getContractAddress("addressQueueStorage"));
         address stakingPool = addressQueueStorage.dequeueItem(keccak256(abi.encodePacked(_queueId)));
         // Emit dequeued event
-        emit StakingPoolDequeued(stakingPool, keccak256(abi.encodePacked(_queueId)), now);
+        emit StakingPoolDequeued(stakingPool, keccak256(abi.encodePacked(_queueId)), block.timestamp);
         // Return
         return stakingPool;
     }
@@ -155,7 +155,7 @@ contract StafiStakingPoolQueue is StafiBase, IStafiStakingPoolQueue {
         IAddressQueueStorage addressQueueStorage = IAddressQueueStorage(getContractAddress("addressQueueStorage"));
         addressQueueStorage.removeItem(keccak256(abi.encodePacked(_queueId)), _stakingPool);
         // Emit removed event
-        emit StakingPoolRemoved(_stakingPool, keccak256(abi.encodePacked(_queueId)), now);
+        emit StakingPoolRemoved(_stakingPool, keccak256(abi.encodePacked(_queueId)), block.timestamp);
     }
 
 }

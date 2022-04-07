@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -21,7 +21,7 @@ contract RETHToken is StafiBase, ERC20PresetMinterPauser, IRETHToken {
     event TokensBurned(address indexed from, uint256 amount, uint256 ethAmount, uint256 time);
 
     // Construct
-    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) ERC20PresetMinterPauser("StaFi", "rETH") public {
+    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) ERC20PresetMinterPauser("StaFi", "rETH") {
         version = 1;
         // Migrate from the old contract to the new contract
         _mint(address(0xB61959B37AADFF714Af150580559858483459b8E), 24132334000000000000);
@@ -81,14 +81,14 @@ contract RETHToken is StafiBase, ERC20PresetMinterPauser, IRETHToken {
     // Only accepts calls from the StafiNetworkWithdrawal contract
     function depositRewards() override external payable onlyLatestContract("stafiNetworkWithdrawal", msg.sender) {
         // Emit ether deposited event
-        emit EtherDeposited(msg.sender, msg.value, now);
+        emit EtherDeposited(msg.sender, msg.value, block.timestamp);
     }
 
     // Deposit excess ETH from deposit pool
     // Only accepts calls from the StafiUserDeposit contract
     function depositExcess() override external payable onlyLatestContract("stafiUserDeposit", msg.sender) {
         // Emit ether deposited event
-        emit EtherDeposited(msg.sender, msg.value, now);
+        emit EtherDeposited(msg.sender, msg.value, block.timestamp);
     }
 
     // Mint rETH
@@ -102,7 +102,7 @@ contract RETHToken is StafiBase, ERC20PresetMinterPauser, IRETHToken {
         // Update balance & supply
         _mint(_to, rethAmount);
         // Emit tokens minted event
-        emit TokensMinted(_to, rethAmount, _ethAmount, now);
+        emit TokensMinted(_to, rethAmount, _ethAmount, block.timestamp);
     }
 
     // Burn rETH for ETH
@@ -124,7 +124,7 @@ contract RETHToken is StafiBase, ERC20PresetMinterPauser, IRETHToken {
         // Transfer ETH to sender
         msg.sender.transfer(ethAmount);
         // Emit tokens burned event
-        emit TokensBurned(msg.sender, _rethAmount, ethAmount, now);
+        emit TokensBurned(msg.sender, _rethAmount, ethAmount, block.timestamp);
     }
 
     // Withdraw ETH from the deposit pool for collateral if required

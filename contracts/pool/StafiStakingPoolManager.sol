@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -18,7 +18,7 @@ contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
     event StakingPoolDestroyed(address indexed stakingPool, address indexed node, uint256 time);
 
     // Construct
-    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {
+    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         version = 1;
     }
 
@@ -81,14 +81,14 @@ contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
     function createStakingPool(address _nodeAddress, DepositType _depositType) override external onlyLatestContract("stafiStakingPoolManager", address(this)) onlyLatestContract("stafiNodeDeposit", msg.sender) returns (address) {
         IStafiStakingPoolQueue stafiStakingPoolQueue = IStafiStakingPoolQueue(getContractAddress("stafiStakingPoolQueue"));
         // Create staking pool contract
-        address contractAddress = address(new StafiStakingPool(address(stafiStorage), _nodeAddress, _depositType));
+        address contractAddress = address(new StafiStakingPool(IStafiStorage(stafiStorage), _nodeAddress, _depositType));
         // Initialize staking pool data
         setBool(keccak256(abi.encodePacked("stakingpool.exists", contractAddress)), true);
         // Add staking pool to indexes
         AddressSetStorage().addItem(keccak256(abi.encodePacked("stakingpools.index")), contractAddress);
         AddressSetStorage().addItem(keccak256(abi.encodePacked("node.stakingpools.index", _nodeAddress)), contractAddress);
         // Emit staking pool created event
-        emit StakingPoolCreated(contractAddress, _nodeAddress, now);
+        emit StakingPoolCreated(contractAddress, _nodeAddress, block.timestamp);
         // Add staking pool to queue
         stafiStakingPoolQueue.enqueueStakingPool(_depositType, contractAddress);
         // Return created staking pool address
@@ -106,7 +106,7 @@ contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
         AddressSetStorage().removeItem(keccak256(abi.encodePacked("stakingpools.index")), msg.sender);
         AddressSetStorage().removeItem(keccak256(abi.encodePacked("node.stakingpools.index", nodeAddress)), msg.sender);
         // Emit staking pool destroyed event
-        emit StakingPoolDestroyed(msg.sender, nodeAddress, now);
+        emit StakingPoolDestroyed(msg.sender, nodeAddress, block.timestamp);
     }
 
     // Set a staking pool's validator pubkey

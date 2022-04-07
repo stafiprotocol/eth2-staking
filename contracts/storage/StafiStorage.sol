@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -28,7 +28,7 @@ contract StafiStorage is IStafiStorage {
 
 
     /// @dev Construct
-    constructor() public {
+    constructor() {
         // Set the main owner upon deployment
         boolStorage[keccak256(abi.encodePacked("access.role", "owner", msg.sender))] = true;
     }

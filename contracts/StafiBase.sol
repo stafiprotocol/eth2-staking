@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -86,7 +86,7 @@ abstract contract StafiBase {
 
 
     /// @dev Set the main Storage address
-    constructor(address _stafiStorageAddress) public {
+    constructor(address _stafiStorageAddress) {
         // Update the contract address
         stafiStorage = IStafiStorage(_stafiStorageAddress);
     }

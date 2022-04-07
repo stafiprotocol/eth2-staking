@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -38,7 +38,7 @@ contract StafiEther is StafiBase, IStafiEther {
         // Update contract balance
         balances[contractKey] = balances[contractKey].add(msg.value);
         // Emit ether deposited event
-        emit EtherDeposited(contractKey, msg.value, now);
+        emit EtherDeposited(contractKey, msg.value, block.timestamp);
     }
 
     // Withdraw an amount of ETH to a network contract
@@ -52,7 +52,7 @@ contract StafiEther is StafiBase, IStafiEther {
         IStafiEtherWithdrawer withdrawer = IStafiEtherWithdrawer(msg.sender);
         withdrawer.receiveEtherWithdrawal{value: _amount}();
         // Emit ether withdrawn event
-        emit EtherWithdrawn(contractKey, _amount, now);
+        emit EtherWithdrawn(contractKey, _amount, block.timestamp);
     }
 
 }

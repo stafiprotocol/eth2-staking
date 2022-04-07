@@ -1,121 +1,109 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../interfaces/storage/IStafiStorage.sol";
-import "../interfaces/eth/IDepositContract.sol";
-import "../interfaces/deposit/IStafiUserDeposit.sol";
-import "../interfaces/pool/IStafiStakingPool.sol";
-import "../interfaces/settings/IStafiNetworkSettings.sol";
-import "../interfaces/pool/IStafiStakingPoolManager.sol";
-import "../interfaces/pool/IStafiStakingPoolQueue.sol";
-import "../interfaces/settings/IStafiStakingPoolSettings.sol";
-import "../interfaces/node/IStafiNodeManager.sol";
 import "../types/DepositType.sol";
-import "../types/StakingPoolStatus.sol";
+import "./StafiStakingPoolStorage.sol";
 
 // An individual staking pool
-contract StafiStakingPool is IStafiStakingPool {
-    // Libs
-    using SafeMath for uint256;
-
-    // Main storage contract
-    IStafiStorage stafiStorage = IStafiStorage(0);
-
-    // Status
-    StakingPoolStatus private status;
-    uint256 private statusBlock;
-    uint256 private statusTime;
-    bool public withdrawalCredentialsMatch;
-
-    // Deposit type
-    DepositType private depositType;
-
-    // Node details
-    address private nodeAddress;
-    uint256 private nodeFee;
-    uint256 private nodeDepositBalance;
-    bool private nodeDepositAssigned;
-
-    uint256 private nodeRefundBalance;
-    bool private nodeCommonlyRefunded;
-    bool private nodeTrustedRefunded;
-
-    // User deposit details
-    uint256 private userDepositBalance;
-    bool private userDepositAssigned;
-    uint256 private userDepositAssignedTime;
-
-    // Platform details
-    uint256 private platformDepositBalance;
+contract StafiStakingPool is StafiStakingPoolStorage {
 
     // Events
-    event StatusUpdated(uint8 indexed status, uint256 time);
-    event EtherDeposited(address indexed from, uint256 amount, uint256 time);
-    event EtherRefunded(address indexed node, address indexed stakingPool, uint256 amount, uint256 time);
-    event EtherWithdrawn(address indexed to, uint256 amount, uint256 time);
-    event MinipoolPrestaked(bytes validatorPubkey, bytes validatorSignature, bytes32 depositDataRoot, uint256 amount, bytes withdrawalCredentials, uint256 time);
-    event VoteWithdrawCredentials(address node);
-
-    // Status getters
-    function getStatus() override public view returns (StakingPoolStatus) { return status; }
-    function getStatusBlock() override public view returns (uint256) { return statusBlock; }
-    function getStatusTime() override public view returns (uint256) { return statusTime; }
-
-    // Deposit type getter
-    function getDepositType() override public view returns (DepositType) { return depositType; }
-
-    // Node detail getters
-    function getNodeAddress() override public view returns (address) { return nodeAddress; }
-    function getNodeFee() override public view returns (uint256) { return nodeFee; }
-    function getNodeDepositBalance() override public view returns (uint256) { return nodeDepositBalance; }
-    function getNodeDepositAssigned() override public view returns (bool) { return nodeDepositAssigned; }
-    function getNodeRefundBalance() override public view returns (uint256) { return nodeRefundBalance; }
-    function getNodeCommonlyRefunded() override public view returns (bool) { return nodeCommonlyRefunded; }
-    function getNodeTrustedRefunded() override public view returns (bool) { return nodeTrustedRefunded; }
-
-    // User deposit detail getters
-    function getUserDepositBalance() override public view returns (uint256) { return userDepositBalance; }
-    function getUserDepositAssigned() override public view returns (bool) { return userDepositAssigned; }
-    function getUserDepositAssignedTime() override public view returns (uint256) { return userDepositAssignedTime; }
-
-    // Platform detail getters
-    function getPlatformDepositBalance() override public view returns (uint256) { return platformDepositBalance; }
-
-    // Construct
-    constructor(address _stafiStorageAddress, address _nodeAddress, DepositType _depositType) public {
-        // Check parameters
-        require(_stafiStorageAddress != address(0x0), "Ivl storage address");
-        require(_nodeAddress != address(0x0), "Ivl node address");
-        require(_depositType != DepositType.None, "Ivl deposit type");
-        // Initialise stafiStorage
-        stafiStorage = IStafiStorage(_stafiStorageAddress);
-        // Set status
-        setStatus(StakingPoolStatus.Initialized);
-        // Set details
-        depositType = _depositType;
-        nodeAddress = _nodeAddress;
-        // Get settings
-        nodeFee = StafiNetworkSettings().getNodeFee();
-    }
+    event EtherReceived(address indexed from, uint256 amount, uint256 time);
+    event DelegateUpgraded(address oldDelegate, address newDelegate, uint256 time);
+    event DelegateRolledBack(address oldDelegate, address newDelegate, uint256 time);
 
     // Only allow access from the owning node address
-    modifier onlyStakingPoolOwner(address _nodeAddress) {
-        require(_nodeAddress == nodeAddress, "Ivl owner");
+    modifier onlyStakingPoolOwner() {
+        require(msg.sender == nodeAddress, "Only the node operator can access this method");
         _;
     }
 
-    // Only allow access from the latest version of the specified contract
-    modifier onlyLatestContract(string memory _contractName, address _contractAddress) {
-        require(_contractAddress == getContractAddress(_contractName), "Ivl or outdated");
-        _;
+    // Construct
+    constructor(IStafiStorage _stafiStorageAddress, address _nodeAddress, DepositType _depositType) {
+        // Initialise StafiStorage
+        require(address(_stafiStorageAddress) != address(0x0), "Invalid storage address");
+        stafiStorage = IStafiStorage(_stafiStorageAddress);
+        // Set storage state to uninitialised
+        storageState = StorageState.Uninitialised;
+        // Set the current delegate
+        address delegateAddress = getContractAddress("stafiStakingPoolDelegate");
+        stafiStakingPoolDelegate = delegateAddress;
+        // Check for contract existence
+        require(contractExists(delegateAddress), "Delegate contract does not exist");
+        // Call initialise on delegate
+        (bool success, bytes memory data) = delegateAddress.delegatecall(abi.encodeWithSignature('initialise(address,uint8)', _nodeAddress, uint8(_depositType)));
+        if (!success) { revert(getRevertMessage(data)); }
     }
-    
-    // Throws if called by any sender that isn't a trusted node
-    modifier onlyTrustedNode(address _nodeAddress) {
-        require(stafiStorage.getBool(keccak256(abi.encodePacked("node.trusted", _nodeAddress))), "Ivl trusted node");
-        _;
+
+    // Receive an ETH deposit
+    receive() external payable {
+        // Emit ether received event
+        emit EtherReceived(msg.sender, msg.value, block.timestamp);
+    }
+   
+    // Delegate all other calls to stafiStakingPoolDelegate contract
+    fallback(bytes calldata _input) external payable returns (bytes memory) {
+        // If useLatestDelegate is set, use the latest delegate contract
+        address delegateContract = useLatestDelegate ? getContractAddress("stafiStakingPoolDelegate") : stafiStakingPoolDelegate;
+        // Check for contract existence
+        require(contractExists(delegateContract), "Delegate contract does not exist");
+        // Execute delegatecall
+        (bool success, bytes memory data) = delegateContract.delegatecall(_input);
+        if (!success) { revert(getRevertMessage(data)); }
+        return data;
+    }
+
+
+    // Upgrade this stafiStakingPool to the latest network delegate contract
+    function delegateUpgrade() external onlyStakingPoolOwner {
+        // Set previous address
+        stafiStakingPoolDelegatePrev = stafiStakingPoolDelegate;
+        // Set new delegate
+        stafiStakingPoolDelegate = getContractAddress("stafiStakingPoolDelegate");
+        // Verify
+        require(stafiStakingPoolDelegate != stafiStakingPoolDelegatePrev, "New delegate is the same as the existing one");
+        // Log event
+        emit DelegateUpgraded(stafiStakingPoolDelegatePrev, stafiStakingPoolDelegate, block.timestamp);
+    }
+
+    // Rollback to previous delegate contract
+    function delegateRollback() external onlyStakingPoolOwner {
+        // Make sure they have upgraded before
+        require(stafiStakingPoolDelegatePrev != address(0x0), "Previous delegate contract is not set");
+        // Store original
+        address originalDelegate = stafiStakingPoolDelegate;
+        // Update delegate to previous and zero out previous
+        stafiStakingPoolDelegate = stafiStakingPoolDelegatePrev;
+        stafiStakingPoolDelegatePrev = address(0x0);
+        // Log event
+        emit DelegateRolledBack(originalDelegate, stafiStakingPoolDelegate, block.timestamp);
+    }
+
+    // If set to true, will automatically use the latest delegate contract
+    function setUseLatestDelegate(bool _setting) external onlyStakingPoolOwner {
+        useLatestDelegate = _setting;
+    }
+
+    // Getter for useLatestDelegate setting
+    function getUseLatestDelegate() external view returns (bool) {
+        return useLatestDelegate;
+    }
+
+    // Returns the address of the stakingpool's stored delegate
+    function getDelegate() external view returns (address) {
+        return stafiStakingPoolDelegate;
+    }
+
+    // Returns the address of the stakingPool's previous delegate (or address(0) if not set)
+    function getPreviousDelegate() external view returns (address) {
+        return stafiStakingPoolDelegatePrev;
+    }
+
+    // Returns the delegate which will be used when calling this minipool taking into account useLatestDelegate setting
+    function getEffectiveDelegate() external view returns (address) {
+        return useLatestDelegate ? getContractAddress("stafiStakingPoolDelegate") : stafiStakingPoolDelegate;
     }
 
     // Get the address of a network contract
@@ -123,216 +111,22 @@ contract StafiStakingPool is IStafiStakingPool {
         return stafiStorage.getAddress(keccak256(abi.encodePacked("contract.address", _contractName)));
     }
 
-    function StafiStakingPoolSettings() public view returns (IStafiStakingPoolSettings) {
-        return IStafiStakingPoolSettings(getContractAddress("stafiStakingPoolSettings"));
-    }
-
-    function StafiStakingPoolManager() public view returns (IStafiStakingPoolManager) {
-        return IStafiStakingPoolManager(getContractAddress("stafiStakingPoolManager"));
-    }
-
-    function StafiNetworkSettings() public view returns (IStafiNetworkSettings) {
-        return IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
-    }
-
-    function EthDeposit() public view returns (IDepositContract) {
-        return IDepositContract(getContractAddress("ethDeposit"));
-    }
-
-    // Assign the node deposit to the staking pool
-    // Only accepts calls from the StafiNodeDeposit contract
-    function nodeDeposit(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) override external payable onlyLatestContract("stafiNodeDeposit", msg.sender) {
-        // Check current status & node deposit status
-        require(status == StakingPoolStatus.Initialized, "status != initialized");
-        require(!nodeDepositAssigned, "assigned error");
-        // Load contracts
-        IStafiStakingPoolManager stafiStakingPoolManager = StafiStakingPoolManager();
-        // Check deposit amount
-        uint256 depositNodeAmount =  StafiStakingPoolSettings().getDepositNodeAmount(depositType);
-        require(msg.value == depositNodeAmount, "Ivl node deposit amount");
-        // Update node deposit details
-        nodeDepositBalance = msg.value;
-        nodeDepositAssigned = true;
-        // Emit ether deposited event
-        emit EtherDeposited(msg.sender, msg.value, now);
-
-        // Check validator pubkey is not in use
-        require(stafiStakingPoolManager.getStakingPoolByPubkey(_validatorPubkey) == address(0x0), "pubkey is used");
-        // Set minipool pubkey
-        stafiStakingPoolManager.setStakingPoolPubkey(_validatorPubkey);
-        // prestake if necessary
-        if (depositType != DepositType.Empty) {
-            preStake(_validatorPubkey, _validatorSignature, _depositDataRoot);
+    // Returns true if contract exists at _contractAddress (if called during that contract's construction it will return a false negative)
+    function contractExists(address _contractAddress) private view returns (bool) {
+        uint32 codeSize;
+        assembly {
+            codeSize := extcodesize(_contractAddress)
         }
+        return codeSize > 0;
     }
-
-    // Assign user deposited ETH to the staking pool and mark it as prelaunch
-    function userDeposit() override external payable onlyLatestContract("stafiUserDeposit", msg.sender) {
-        // Check current status & user deposit status
-        // The user deposit can only be assigned while initialized, in prelaunch, or staking
-        require(status >= StakingPoolStatus.Initialized && status <= StakingPoolStatus.Staking, "status unmatch");
-        require(!userDepositAssigned, "assigned");
-        // Check deposit amount
-        require(msg.value == StafiStakingPoolSettings().getDepositUserAmount(depositType), "Ivl user deposit amount");
-        // Update user deposit details
-        userDepositBalance = msg.value;
-        userDepositAssigned = true;
-        userDepositAssignedTime = now;
-        // Emit ether deposited event
-        emit EtherDeposited(msg.sender, msg.value, now);
-        // Progress initialized staking pool to prelaunch
-        if (status == StakingPoolStatus.Initialized) { setStatus(StakingPoolStatus.Prelaunch); }
-    }
-
-    // Progress the staking pool to staking, sending its ETH deposit to the VRC
-    // Only accepts calls from the staking pool owner (node)
-    function stake(bytes calldata _validatorSignature, bytes32 _depositDataRoot) override external onlyStakingPoolOwner(msg.sender) {
-        // Check current status
-        require(status == StakingPoolStatus.Prelaunch, "status unmatch");
-        // Check withdrawCredentials match
-        require(withdrawalCredentialsMatch, "Ivl withdraw credentials");
-        // Check staking pool balance
-        require(address(this).balance >= userDepositBalance, "Insufficient balance");
-        // Send staking deposit to casper
-        EthDeposit().deposit{value: userDepositBalance}(StafiStakingPoolManager().getStakingPoolPubkey(address(this)),
-        StafiNetworkSettings().getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
-        // Progress to staking
-        setStatus(StakingPoolStatus.Staking);
-    }
-
-
-    // Stakes some ETH into the deposit contract to set withdrawal credentials to this contract
-    function preStake(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) internal {
-        // Check minipool balance
-        require(address(this).balance >= nodeDepositBalance, "Insufficient balance");
-        // Get withdrawal credentials
-        bytes memory withdrawalCredentials = StafiNetworkSettings().getWithdrawalCredentials();
-        // Send staking deposit to casper
-        EthDeposit().deposit{value : nodeDepositBalance}(_validatorPubkey, withdrawalCredentials, _validatorSignature, _depositDataRoot);
-        // Emit event
-        emit MinipoolPrestaked(_validatorPubkey, _validatorSignature, _depositDataRoot, nodeDepositBalance, withdrawalCredentials, block.timestamp);
-    }
-
-    // Submit network balances for a block
-    // Only accepts calls from trusted (oracle) nodes
-    function voteWithdrawCredentials() override external onlyTrustedNode(msg.sender) {
-        // Get submission keys
-        bytes32 nodeSubmissionKey = keccak256(abi.encodePacked("stafi.stakingpool.withdrawcredentials.vote", msg.sender, address(this)));
-        bytes32 submissionCountKey = keccak256(abi.encodePacked("stafi.stakingpool.withdrawcredentials.vote.count", address(this)));
-        // Check & update node submission status
-        require(!stafiStorage.getBool(nodeSubmissionKey), "double vote");
-        stafiStorage.setBool(nodeSubmissionKey, true);
-        // Increment submission count
-        uint256 submissionCount = stafiStorage.getUint(submissionCountKey).add(1);
-        stafiStorage.setUint(submissionCountKey, submissionCount);
-        // Emit event
-        emit VoteWithdrawCredentials(msg.sender);
-        // Check submission count & update network balances
-        uint256 calcBase = 1 ether;
-        IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
-        if (calcBase.mul(submissionCount) >= stafiNodeManager.getTrustedNodeCount().mul(StafiNetworkSettings().getNodeConsensusThreshold()) && !withdrawalCredentialsMatch) {
-            withdrawalCredentialsMatch = true;
+    
+    // Get a revert message from delegatecall return data
+    function getRevertMessage(bytes memory _returnData) private pure returns (string memory) {
+        if (_returnData.length < 68) { return "Transaction reverted silently"; }
+        assembly {
+            _returnData := add(_returnData, 0x04)
         }
+        return abi.decode(_returnData, (string));
     }
-
-    // Progress the refund
-    // Only accepts calls from the staking pool owner (node)
-    function refund() override external onlyStakingPoolOwner(msg.sender) {
-        // Check current status
-        // The staking pool can only be refunded while staking
-        require(status == StakingPoolStatus.Staking, "status unmatch");
-        require(!nodeTrustedRefunded, "already refunded");
-
-        address poolAddress = address(this);
-        uint256 calcBase = 1 ether;
-        if (StafiStakingPoolSettings().getStakingPoolTrustedRefundedEnabled(poolAddress)) {
-            uint256 totalNodeDepositBalance = nodeDepositBalance;
-            if (nodeCommonlyRefunded) {
-                totalNodeDepositBalance = nodeDepositBalance.add(nodeRefundBalance);
-            }
-            nodeRefundBalance = totalNodeDepositBalance.mul(StafiNetworkSettings().getNodeTrustedRefundRatio()).div(calcBase);
-            platformDepositBalance = nodeRefundBalance;
-            nodeDepositBalance = totalNodeDepositBalance.sub(nodeRefundBalance);
-            nodeTrustedRefunded = true;
-        } else {
-            require(!nodeCommonlyRefunded, "already refunded commonly");
-            require(StafiStakingPoolSettings().getStakingPoolRefundedEnabled(poolAddress), "refunded not enabled");
-
-            nodeRefundBalance = nodeDepositBalance.mul(StafiNetworkSettings().getNodeRefundRatio()).div(calcBase);
-            platformDepositBalance = nodeRefundBalance;
-            nodeDepositBalance = nodeDepositBalance.sub(nodeRefundBalance);
-            nodeCommonlyRefunded = true;   
-        }
-        // Emit ether refunded event
-        emit EtherRefunded(msg.sender, poolAddress, nodeRefundBalance, now);
-    }
-
-    // Dissolve the staking pool, returning user deposited ETH to the deposit pool
-    // Only accepts calls from the staking pool owner (node), or from any address if timed out
-    function dissolve() override external {
-        // Check current status
-        // The staking pool can only be dissolved while initialized or in prelaunch
-        require(status == StakingPoolStatus.Initialized || status == StakingPoolStatus.Prelaunch, "status unmatch");
-        // Load contracts
-        IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
-        // Check if being dissolved by staking pool owner or staking pool is timed out
-        require(
-            msg.sender == nodeAddress ||
-            (status == StakingPoolStatus.Prelaunch && block.number.sub(statusBlock) >= StafiStakingPoolSettings().getLaunchTimeout()),
-            "must owner or timed out"
-        );
-        // Remove staking pool from queue
-        if (!userDepositAssigned) { IStafiStakingPoolQueue(getContractAddress("stafiStakingPoolQueue")).removeStakingPool(); }
-        // Transfer user balance to deposit pool
-        if (userDepositBalance > 0) {
-            // Transfer
-            stafiUserDeposit.recycleDissolvedDeposit{value: userDepositBalance}();
-            userDepositBalance = 0;
-            // Emit ether withdrawn event
-            emit EtherWithdrawn(address(stafiUserDeposit), userDepositBalance, now);
-        }
-        // Progress to dissolved
-        setStatus(StakingPoolStatus.Dissolved);
-    }
-
-    // Withdraw node balances from the staking pool and close it
-    // Only accepts calls from the staking pool owner (node)
-    function close() override external onlyStakingPoolOwner(msg.sender) {
-        // Check current status
-        // The staking pool can only be closed while dissolved
-        require(status == StakingPoolStatus.Dissolved, "status unmatch");
-        // Transfer node balance to node operator
-        uint256 nodeBalance = nodeDepositBalance;
-        if (nodeBalance > 0) {
-            // Update node balances
-            nodeDepositBalance = 0;
-            // Transfer balance
-            (bool success,) = nodeAddress.call{value: nodeBalance}("");
-            require(success, "transferr failed");
-            // Emit ether withdrawn event
-            emit EtherWithdrawn(nodeAddress, nodeBalance, now);
-        }
-        // Destroy staking pool
-        destroy();
-    }
-
-    // Set the staking pool's current status
-    function setStatus(StakingPoolStatus _status) private {
-        // Update status
-        status = _status;
-        statusBlock = block.number;
-        statusTime = now;
-        // Emit status updated event
-        emit StatusUpdated(uint8(_status), now);
-    }
-
-    // Destroy the staking pool
-    function destroy() private {
-        // Destroy staking pool
-        IStafiStakingPoolManager stafiStakingPoolManager = StafiStakingPoolManager();
-        stafiStakingPoolManager.destroyStakingPool();
-        // Self destruct & send any remaining ETH to stafiEther
-        selfdestruct(payable(getContractAddress("stafiEther")));
-    }
-
+    
 }

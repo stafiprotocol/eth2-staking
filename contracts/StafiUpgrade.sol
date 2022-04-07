@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -13,7 +13,7 @@ contract StafiUpgrade is StafiBase, IStafiUpgrade {
     event ContractAdded(bytes32 indexed name, address indexed newAddress, uint256 time);
 
     // Construct
-    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {
+    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         version = 1;
     }
 
@@ -38,7 +38,7 @@ contract StafiUpgrade is StafiBase, IStafiUpgrade {
         deleteString(keccak256(abi.encodePacked("contract.name", oldContractAddress)));
         deleteBool(keccak256(abi.encodePacked("contract.exists", oldContractAddress)));
         // Emit contract upgraded event
-        emit ContractUpgraded(nameHash, oldContractAddress, _contractAddress, now);
+        emit ContractUpgraded(nameHash, oldContractAddress, _contractAddress, block.timestamp);
     }
 
     // Add a new network contract
@@ -55,7 +55,7 @@ contract StafiUpgrade is StafiBase, IStafiUpgrade {
         setString(keccak256(abi.encodePacked("contract.name", _contractAddress)), _name);
         setAddress(keccak256(abi.encodePacked("contract.address", _name)), _contractAddress);
         // Emit contract added event
-        emit ContractAdded(nameHash, _contractAddress, now);
+        emit ContractAdded(nameHash, _contractAddress, block.timestamp);
     }
 
     // Init stafi storage contract
@@ -88,7 +88,7 @@ contract StafiUpgrade is StafiBase, IStafiUpgrade {
             deleteString(keccak256(abi.encodePacked("contract.name", oldContractAddress)));
         }
         // Emit contract added event
-        emit ContractAdded(nameHash, _contractAddress, now);
+        emit ContractAdded(nameHash, _contractAddress, block.timestamp);
     }
 
 }

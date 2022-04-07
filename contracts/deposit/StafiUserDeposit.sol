@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -24,7 +24,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
     event ExcessWithdrawn(address indexed to, uint256 amount, uint256 time);
 
     // Construct
-    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {
+    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         version = 1;
         // Initialize settings on deployment
         if (!getBoolS("settings.user.deposit.init")) {
@@ -71,7 +71,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         // Mint rETH to user account
         rETHToken.userMint(msg.value, msg.sender);
         // Emit deposit received event
-        emit DepositReceived(msg.sender, msg.value, now);
+        emit DepositReceived(msg.sender, msg.value, block.timestamp);
         // Process deposit
         processDeposit();
     }
@@ -80,7 +80,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
     // Only accepts calls from registered stakingPools
     function recycleDissolvedDeposit() override external payable onlyLatestContract("stafiUserDeposit", address(this)) onlyRegisteredStakingPool(msg.sender) {
         // Emit deposit recycled event
-        emit DepositRecycled(msg.sender, msg.value, now);
+        emit DepositRecycled(msg.sender, msg.value, block.timestamp);
         // Process deposit
         processDeposit();
     }
@@ -88,7 +88,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
     // Recycle a deposit from a withdrawn stakingPool
     function recycleWithdrawnDeposit() override external payable onlyLatestContract("stafiUserDeposit", address(this)) onlyLatestContract("stafiNetworkWithdrawal", msg.sender) {
         // Emit deposit recycled event
-        emit DepositRecycled(msg.sender, msg.value, now);
+        emit DepositRecycled(msg.sender, msg.value, block.timestamp);
         // Process deposit
         processDeposit();
     }
@@ -124,7 +124,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
             // Assign deposit to staking pool
             stakingPool.userDeposit{value: stakingPoolCapacity}();
             // Emit deposit assigned event
-            emit DepositAssigned(stakingPoolAddress, stakingPoolCapacity, now);
+            emit DepositAssigned(stakingPoolAddress, stakingPoolCapacity, block.timestamp);
         }
     }
 
@@ -140,7 +140,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         // Transfer to rETH contract
         rETHToken.depositExcess{value: _amount}();
         // Emit excess withdrawn event
-        emit ExcessWithdrawn(msg.sender, _amount, now);
+        emit ExcessWithdrawn(msg.sender, _amount, block.timestamp);
     }
 
     // Deposits currently enabled

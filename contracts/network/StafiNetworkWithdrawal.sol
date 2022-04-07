@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -25,7 +25,7 @@ contract StafiNetworkWithdrawal is StafiBase, IStafiNetworkWithdrawal {
     event WithdrawalProcessed(address indexed stakingPool, uint256 nodeAmount, uint256 userAmount, uint256 time);
 
     // Construct
-    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {
+    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         version = 1;
     }
 
@@ -44,7 +44,7 @@ contract StafiNetworkWithdrawal is StafiBase, IStafiNetworkWithdrawal {
         // Transfer ETH to vault
         stafiEther.depositEther{value: msg.value}();
         // Emit withdrawal received event
-        emit WithdrawalReceived(msg.sender, msg.value, now);
+        emit WithdrawalReceived(msg.sender, msg.value, block.timestamp);
     }
 
     // Withdraw a stakingpool
@@ -126,7 +126,7 @@ contract StafiNetworkWithdrawal is StafiBase, IStafiNetworkWithdrawal {
             stafiUserDeposit.recycleWithdrawnDeposit{value: userAmount}();
         }
         // Emit withdrawal processed event
-        emit WithdrawalProcessed(_stakingPoolAddress, nodeAmount, userAmount, now);
+        emit WithdrawalProcessed(_stakingPoolAddress, nodeAmount, userAmount, block.timestamp);
     }
 
     // Calculate the node reward amount for a stakingpool

@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -19,7 +19,7 @@ contract StafiNetworkBalances is StafiBase, IStafiNetworkBalances {
     event BalancesUpdated(uint256 block, uint256 totalEth, uint256 stakingEth, uint256 rethSupply, uint256 time);
 
     // Construct
-    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {
+    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         version = 1;
     }
 
@@ -86,7 +86,7 @@ contract StafiNetworkBalances is StafiBase, IStafiNetworkBalances {
         uint256 submissionCount = getUint(submissionCountKey).add(1);
         setUint(submissionCountKey, submissionCount);
         // Emit balances submitted event
-        emit BalancesSubmitted(msg.sender, _block, _totalEth, _stakingEth, _rethSupply, now);
+        emit BalancesSubmitted(msg.sender, _block, _totalEth, _stakingEth, _rethSupply, block.timestamp);
         // Check submission count & update network balances
         uint256 calcBase = 1 ether;
         IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
@@ -103,7 +103,7 @@ contract StafiNetworkBalances is StafiBase, IStafiNetworkBalances {
         setStakingETHBalance(_stakingEth);
         setTotalRETHSupply(_rethSupply);
         // Emit balances updated event
-        emit BalancesUpdated(_block, _totalEth, _stakingEth, _rethSupply, now);
+        emit BalancesUpdated(_block, _totalEth, _stakingEth, _rethSupply, block.timestamp);
     }
 
 }

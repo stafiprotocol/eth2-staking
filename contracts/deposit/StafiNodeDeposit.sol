@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -18,7 +18,7 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
     event DepositReceived(address indexed from, uint256 amount, uint256 time);
 
     // Construct
-    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {
+    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         version = 1;
          // Initialize settings on deployment
         if (!getBoolS("settings.node.deposit.init")) {
@@ -53,7 +53,7 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
         // Check deposit type
         require(depositType != DepositType.None, "Invalid node deposit amount");
         // Emit deposit received event
-        emit DepositReceived(msg.sender, msg.value, now);
+        emit DepositReceived(msg.sender, msg.value, block.timestamp);
         // Register the node
         stafiNodeManager.registerNode(msg.sender);
         // Create staking pool

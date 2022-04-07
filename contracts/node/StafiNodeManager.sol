@@ -1,4 +1,4 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -14,7 +14,7 @@ contract StafiNodeManager is StafiBase, IStafiNodeManager {
     event NodeTrustedSet(address indexed node, bool trusted, uint256 time);
 
     // Construct
-    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {
+    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         version = 1;
     }
 
@@ -63,7 +63,7 @@ contract StafiNodeManager is StafiBase, IStafiNodeManager {
             // Add node to index
             addressSetStorage.addItem(keccak256(abi.encodePacked("nodes.index")), _nodeAddress);
             // Emit node registered event
-            emit NodeRegistered(_nodeAddress, now);
+            emit NodeRegistered(_nodeAddress, block.timestamp);
         }
     }
 
@@ -80,7 +80,7 @@ contract StafiNodeManager is StafiBase, IStafiNodeManager {
         if (_trusted) { addressSetStorage.addItem(keccak256(abi.encodePacked("nodes.trusted.index")), _nodeAddress); }
         else { addressSetStorage.removeItem(keccak256(abi.encodePacked("nodes.trusted.index")), _nodeAddress); }
         // Emit node trusted set event
-        emit NodeTrustedSet(_nodeAddress, _trusted, now);
+        emit NodeTrustedSet(_nodeAddress, _trusted, block.timestamp);
     }
 
 }
