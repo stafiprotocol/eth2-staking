@@ -10,6 +10,7 @@ interface IStafiStakingPool {
     function getStatus() external view returns (StakingPoolStatus);
     function getStatusBlock() external view returns (uint256);
     function getStatusTime() external view returns (uint256);
+    function getWithdrawalCredentialsMatch() external view returns (bool);
     function getDepositType() external view returns (DepositType);
     function getNodeAddress() external view returns (address);
     function getNodeFee() external view returns (uint256);

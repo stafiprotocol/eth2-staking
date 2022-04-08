@@ -101,7 +101,7 @@ contract StafiStakingPool is StafiStakingPoolStorage {
         return stafiStakingPoolDelegatePrev;
     }
 
-    // Returns the delegate which will be used when calling this minipool taking into account useLatestDelegate setting
+    // Returns the delegate which will be used when calling this stakingPool taking into account useLatestDelegate setting
     function getEffectiveDelegate() external view returns (address) {
         return useLatestDelegate ? getContractAddress("stafiStakingPoolDelegate") : stafiStakingPoolDelegate;
     }

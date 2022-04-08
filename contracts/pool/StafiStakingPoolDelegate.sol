@@ -26,13 +26,14 @@ contract StafiStakingPoolDelegate is StafiStakingPoolStorage, IStafiStakingPool 
     event EtherDeposited(address indexed from, uint256 amount, uint256 time);
     event EtherRefunded(address indexed node, address indexed stakingPool, uint256 amount, uint256 time);
     event EtherWithdrawn(address indexed to, uint256 amount, uint256 time);
-    event MinipoolPrestaked(bytes validatorPubkey, bytes validatorSignature, bytes32 depositDataRoot, uint256 amount, bytes withdrawalCredentials, uint256 time);
-    event VoteWithdrawCredentials(address node);
+    event StakingPoolPrestaked(bytes validatorPubkey, bytes validatorSignature, bytes32 depositDataRoot, uint256 amount, bytes withdrawalCredentials, uint256 time);
+    event VoteWithdrawalCredentials(address node);
 
     // Status getters
     function getStatus() override external view returns (StakingPoolStatus) { return status; }
     function getStatusBlock() override external view returns (uint256) { return statusBlock; }
     function getStatusTime() override external view returns (uint256) { return statusTime; }
+    function getWithdrawalCredentialsMatch() override external view returns (bool) { return withdrawalCredentialsMatch; }
 
     // Deposit type getter
     function getDepositType() override external view returns (DepositType) { return depositType; }
@@ -138,7 +139,7 @@ contract StafiStakingPoolDelegate is StafiStakingPoolStorage, IStafiStakingPool 
 
         // Check validator pubkey is not in use
         require(stafiStakingPoolManager.getStakingPoolByPubkey(_validatorPubkey) == address(0x0), "pubkey is used");
-        // Set minipool pubkey
+        // Set stakingPool pubkey
         stafiStakingPoolManager.setStakingPoolPubkey(_validatorPubkey);
         // prestake if necessary
         if (depositType != DepositType.Empty) {
@@ -170,7 +171,7 @@ contract StafiStakingPoolDelegate is StafiStakingPoolStorage, IStafiStakingPool 
         // Check current status
         require(status == StakingPoolStatus.Prelaunch, "status unmatch");
         // Check withdrawCredentials match
-        require(withdrawalCredentialsMatch, "invalid withdraw credentials");
+        require(withdrawalCredentialsMatch || depositType == DepositType.Empty, "invalid withdraw credentials");
         // Check staking pool balance
         require(address(this).balance >= userDepositBalance, "Insufficient balance");
         // Send staking deposit to casper
@@ -183,14 +184,14 @@ contract StafiStakingPoolDelegate is StafiStakingPoolStorage, IStafiStakingPool 
 
     // Stakes some ETH into the deposit contract to set withdrawal credentials to this contract
     function preStake(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) internal {
-        // Check minipool balance
+        // Check stakingPool balance
         require(address(this).balance >= nodeDepositBalance, "Insufficient balance");
         // Get withdrawal credentials
         bytes memory withdrawalCredentials = StafiNetworkSettings().getWithdrawalCredentials();
         // Send staking deposit to casper
         EthDeposit().deposit{value : nodeDepositBalance}(_validatorPubkey, withdrawalCredentials, _validatorSignature, _depositDataRoot);
         // Emit event
-        emit MinipoolPrestaked(_validatorPubkey, _validatorSignature, _depositDataRoot, nodeDepositBalance, withdrawalCredentials, block.timestamp);
+        emit StakingPoolPrestaked(_validatorPubkey, _validatorSignature, _depositDataRoot, nodeDepositBalance, withdrawalCredentials, block.timestamp);
     }
 
     // Only accepts calls from trusted (oracle) nodes
@@ -201,7 +202,7 @@ contract StafiStakingPoolDelegate is StafiStakingPoolStorage, IStafiStakingPool 
         // Increment votes count
         totalVotes = totalVotes.add(1);
         // Emit event
-        emit VoteWithdrawCredentials(msg.sender);
+        emit VoteWithdrawalCredentials(msg.sender);
         // Check submission count & update network balances
         uint256 calcBase = 1 ether;
         IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
