@@ -1,7 +1,7 @@
 pragma solidity 0.7.6;
 
 // SPDX-License-Identifier: GPL-3.0-only
-
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./StafiStakingPool.sol";
 import "../StafiBase.sol";
 import "../interfaces/pool/IStafiStakingPool.sol";
@@ -9,10 +9,12 @@ import "../interfaces/pool/IStafiStakingPoolManager.sol";
 import "../interfaces/pool/IStafiStakingPoolQueue.sol";
 import "../interfaces/storage/IAddressSetStorage.sol";
 import "../types/DepositType.sol";
+import "../types/StakingPoolStatus.sol";
 
 // Staking pool creation, removal and management
 contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
-
+    // Libs
+    using SafeMath for uint256;
     // Events
     event StakingPoolCreated(address indexed stakingPool, address indexed node, uint256 time);
     event StakingPoolDestroyed(address indexed stakingPool, address indexed node, uint256 time);
@@ -74,6 +76,33 @@ contract StafiStakingPoolManager is StafiBase, IStafiStakingPoolManager {
     // Get a staking pool's withdrawal processed status
     function getStakingPoolWithdrawalProcessed(address _stakingPoolAddress) override public view returns (bool) {
         return getBool(keccak256(abi.encodePacked("stakingpool.withdrawal.processed", _stakingPoolAddress)));
+    }
+
+    // Returns an array of all stakingPools in the prelaunch state
+    function getPrelaunchStakingpools(uint256 offset, uint256 limit) override external view returns (address[] memory) {
+        // Precompute stakingPool key
+        bytes32 stakingPoolKey = keccak256(abi.encodePacked("stakingpools.index"));
+        // Iterate over the requested stakingPool range
+        uint256 totalStakingPools = getStakingPoolCount();
+        uint256 max = offset.add(limit);
+        if (max > totalStakingPools || limit == 0) { max = totalStakingPools; }
+        // Create array big enough for every staking pool
+        address[] memory stakingPools = new address[](max.sub(offset));
+        uint256 total = 0;
+        for (uint256 i = offset; i < max; i++) {
+            // Get the staking pool at index i
+            IStafiStakingPool stakingPool = IStafiStakingPool(AddressSetStorage().getItem(stakingPoolKey, i));
+            // Get the staking pool's status, and to array if it's in prelaunch
+            if (stakingPool.getStatus() == StakingPoolStatus.Prelaunch) {
+                stakingPools[total] = address(stakingPool);
+                total++;
+            }
+        }
+        // Dirty hack to cut unused elements off end of return value
+        assembly {
+            mstore(stakingPools, total)
+        }
+        return stakingPools;
     }
 
     // Create a staking pool
