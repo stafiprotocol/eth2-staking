@@ -25,10 +25,10 @@ npm install
 npm run compile
 ```
 
-# contract size
+# Show contract size
 
 ```
-truffle run contract-size
+npm run contract-size
 ```
 # Credits
 Special thanks to these libraries which have been great references for developing eth2-staking

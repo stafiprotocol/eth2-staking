@@ -1,10 +1,11 @@
 {
   "name": "eth2-staking",
-  "version": "0.1.0",
-  "description": "",
+  "version": "0.2.0",
+  "description": "Ethereum 2.0 liquid staking",
   "repository": "https://github.com/stafiprotocol/eth2-staking",
   "scripts": {
-    "compile": "truffle compile"
+    "compile": "truffle compile",
+    "contract-size": "truffle run contract-size --contracts StafiNodeDeposit StafiUserDeposit StafiNetworkBalances StafiNetworkWithdrawal StafiNodeManager StafiStakingPool StafiStakingPoolDelegate StafiStakingPoolManager StafiStakingPoolQueue  StafiNetworkSettings StafiStakingPoolSettings AddressQueueStorage AddressSetStorage StafiStorage RETHToken StafiEther StafiUpgrade"
   },
   "author": "Stafi Technologies",
   "license": "GPL-3.0-only",
