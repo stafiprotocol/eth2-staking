@@ -22,7 +22,7 @@ contract StafiEther is StafiBase, IStafiEther {
     event EtherWithdrawn(bytes32 indexed by, uint256 amount, uint256 time);
 
 	// Construct
-    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) public {
+    constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         version = 1;
     }
 
