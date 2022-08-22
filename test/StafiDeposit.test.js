@@ -1,5 +1,5 @@
-const { ethers } = require("hardhat")
-const { expect, assert } = require("chai")
+const { ethers, web3 } = require("hardhat")
+const { expect } = require("chai")
 const { time, beacon } = require("./utilities")
 
 describe("StafiUserDeposit", function () {
@@ -9,6 +9,8 @@ describe("StafiUserDeposit", function () {
         this.AccountAdmin = this.signers[0]
         this.AccountUser1 = this.signers[1]
         this.AccountNode1 = this.signers[2]
+        this.AccountTrustNode1 = this.signers[3]
+        this.AccountWithdrawer1 = this.signers[4]
 
 
 
@@ -67,7 +69,7 @@ describe("StafiUserDeposit", function () {
         this.ContractRETHToken = await this.FactoryRETHToken.deploy(this.ContractStafiStorage.address)
         await this.ContractRETHToken.deployed()
         console.log("contract RETHToken address: ", this.ContractRETHToken.address)
-
+        await this.ContractStafiUpgrade.addContract("rETHToken", this.ContractRETHToken.address)
 
 
         this.ContractAddressSetStorage = await this.FactoryAddressSetStorage.deploy(this.ContractStafiStorage.address)
@@ -147,22 +149,89 @@ describe("StafiUserDeposit", function () {
         await this.ContractStafiNetworkSettings.setWithdrawalCredentials(this.WithdrawalCredentials)
 
 
+        await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeTrusted(this.AccountTrustNode1.address, true)
+
     })
 
-    it("should deposit success", async function () {
-        console.log("latest time: ", await time.latest())
-        // Get validator deposit data
+    it("node and user should deposit/withdraw success", async function () {
+        console.log("latest block: ", await time.latestBlock())
+
+        // user deposit
+        let userDepositTx = await this.ContractStafiUserDeposit.connect(this.AccountUser1).deposit({ from: this.AccountUser1.address, value: web3.utils.toWei('28', 'ether') })
+        let userDepositTxRecipient = await userDepositTx.wait()
+        console.log("user deposit tx gas: ", userDepositTxRecipient.gasUsed.toString())
+
+        // node deposit
         let depositData = {
             pubkey: beacon.getValidatorPubkey(),
             withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
             amount: BigInt(4000000000), // gwei
             signature: beacon.getValidatorSignature(),
         };
-
         let depositDataRoot = beacon.getDepositDataRoot(depositData);
 
+        let nodeDepositTx = await this.ContracStafiNodeDeposit.connect(this.AccountNode1).deposit(
+            depositData.pubkey, depositData.signature, depositDataRoot, { from: this.AccountNode1.address, value: web3.utils.toWei('4', 'ether') })
+        let nodeDepositTxRecipient = await nodeDepositTx.wait()
+        console.log("node deposit tx gas: ", nodeDepositTxRecipient.gasUsed.toString())
 
-        await this.ContracStafiNodeDeposit.connect(this.AccountNode1).deposit(depositData.pubkey, depositData.signature, depositDataRoot, { from: this.AccountNode1.address, value: web3.utils.toWei('4', 'ether') })
+        // check state
+        let stakingPoolAddress = await this.ContractStafiStakingPoolManager.getStakingPoolByPubkey(depositData.pubkey)
+        let contractStakingPool = await ethers.getContractAt("StafiStakingPoolDelegate", stakingPoolAddress)
 
+        expect(await contractStakingPool.getStatus()).to.equal(1)
+        expect(await contractStakingPool.getNodeDepositAssigned()).to.equal(true)
+        expect(await contractStakingPool.getUserDepositAssigned()).to.equal(true)
+        expect(await contractStakingPool.getWithdrawalCredentialsMatch()).to.equal(false)
+        expect((await contractStakingPool.getNodeDepositBalance()).toString()).to.equal(web3.utils.toWei("4", 'ether'))
+        expect((await contractStakingPool.getUserDepositBalance()).toString()).to.equal(web3.utils.toWei("28", 'ether'))
+        expect((await ethers.provider.getBalance(stakingPoolAddress)).toString()).to.equal(web3.utils.toWei("28", 'ether'))
+
+        // trust node vote withdrawCredentials
+        await contractStakingPool.connect(this.AccountTrustNode1).voteWithdrawCredentials()
+
+        expect(await contractStakingPool.getWithdrawalCredentialsMatch()).to.equal(true)
+
+        // node stake
+        let depositData2 = {
+            pubkey: depositData.pubkey,
+            withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
+            amount: BigInt(28000000000), // gwei
+            signature: beacon.getValidatorSignature(),
+        };
+        let depositDataRoot2 = beacon.getDepositDataRoot(depositData2);
+
+        let nodeStakeTx = await contractStakingPool.connect(this.AccountNode1).stake(depositData2.signature, depositDataRoot2)
+        let nodeStakeTxRecipient = await nodeStakeTx.wait()
+        console.log("node stake tx gas: ", nodeStakeTxRecipient.gasUsed.toString())
+
+        // check state
+        expect((await ethers.provider.getBalance(stakingPoolAddress)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
+        expect(await contractStakingPool.getStatus()).to.equal(2)
+
+
+        expect((await ethers.provider.getBalance(this.ContractStafiNetworkWithdrawal.address)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
+
+        // start: total 32eth, node 4eth, users 28eth 
+        // end: total 38eth, platform 0.6eth, node 4 + 5.4*1/8 + 5.4*7/8*1/10 = 5.1475, users 28 + 5.4*7/8*9/10 = 32.2525
+        // send deposit and reward eth to StafiNetworkWithdrawal contract
+        await this.AccountWithdrawer1.sendTransaction({
+            to: this.ContractStafiNetworkWithdrawal.address,
+            value: web3.utils.toWei("38", "ether")
+        })
+
+        expect((await ethers.provider.getBalance(this.ContractStafiNetworkWithdrawal.address)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
+        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("38", 'ether'))
+        let nodeBalanceBefore = await ethers.provider.getBalance(this.AccountNode1.address)
+
+        // distribute deposit and reward to node/users by trust node
+        let startBalance = web3.utils.toWei("32", "ether")
+        let endBalance = web3.utils.toWei("38", "ether")
+        await this.ContractStafiNetworkWithdrawal.connect(this.AccountTrustNode1).withdrawStakingPool(stakingPoolAddress, startBalance, endBalance)
+        let nodeBalanceAfter = await ethers.provider.getBalance(this.AccountNode1.address)
+
+        expect(nodeBalanceAfter.sub(nodeBalanceBefore).toString()).to.equal(web3.utils.toWei("5.1475", "ether"))
+        expect((await ethers.provider.getBalance(this.ContractStafiNetworkWithdrawal.address)).toString()).to.equal(web3.utils.toWei("0.6", 'ether'))
+        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("32.2525", 'ether'))
     })
 })

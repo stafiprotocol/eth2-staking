@@ -12,10 +12,11 @@ import "../interfaces/node/IStafiNodeManager.sol";
 import "../interfaces/deposit/IStafiUserDeposit.sol";
 import "../interfaces/settings/IStafiNetworkSettings.sol";
 import "../interfaces/network/IStafiNetworkWithdrawal.sol";
+import "../interfaces/IStafiEtherWithdrawer.sol";
 import "../types/StakingPoolStatus.sol";
 
 // Handles network validator withdrawals
-contract StafiNetworkWithdrawal is StafiBase, IStafiNetworkWithdrawal {
+contract StafiNetworkWithdrawal is StafiBase, IStafiNetworkWithdrawal, IStafiEtherWithdrawer {
 
     // Libs
     using SafeMath for uint256;
@@ -28,7 +29,11 @@ contract StafiNetworkWithdrawal is StafiBase, IStafiNetworkWithdrawal {
     constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         version = 1;
     }
-
+    
+    // Receive a ether withdrawal
+    // Only accepts calls from the StafiEther contract
+    function receiveEtherWithdrawal() override external payable onlyLatestContract("stafiNetworkWithdrawal", address(this)) onlyLatestContract("stafiEther", msg.sender) {}
+    
     // Current withdrawal pool balance
     function getBalance() override public view returns (uint256) {
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));

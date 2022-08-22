@@ -16,9 +16,14 @@ async function increase(value) {
   await advanceBlock()
 }
 
-async function latest() {
+async function latestTime() {
   const block = await ethers.provider.getBlock("latest")
   return BigNumber.from(block.timestamp)
+}
+
+async function latestBlock() {
+  const block = await ethers.provider.getBlock("latest")
+  return block.number
 }
 
 async function advanceTimeAndBlock(time) {
@@ -55,7 +60,8 @@ module.exports = {
   advanceBlock,
   advanceBlockTo,
   duration,
-  latest,
+  latestTime,
+  latestBlock,
   increase,
   advanceTime,
   advanceTimeAndBlock,

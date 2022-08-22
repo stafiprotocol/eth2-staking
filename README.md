@@ -25,11 +25,18 @@ npm install
 npm run compile
 ```
 
+# Test
+
+```
+npm run test
+```
+
 # Show contract size
 
 ```
 npm run size
 ```
+
 # Credits
 Special thanks to these libraries which have been great references for developing eth2-staking
 
