@@ -1,4 +1,6 @@
 require("hardhat-contract-sizer")
+require("@nomiclabs/hardhat-ethers");
+require("@nomiclabs/hardhat-web3");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
