@@ -10,4 +10,5 @@ interface IStafiUserDeposit {
     function recycleWithdrawnDeposit() external payable;
     function assignDeposits() external;
     function withdrawExcessBalance(uint256 _amount) external;
+    function withdrawEth(uint256 _amount) external;
 }
