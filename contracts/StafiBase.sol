@@ -38,6 +38,14 @@ abstract contract StafiBase {
         require(getBool(keccak256(abi.encodePacked("node.trusted", _nodeAddress))), "Invalid trusted node");
         _;
     }
+    
+    /**
+    * @dev Throws if called by any sender that isn't a super node
+    */
+    modifier onlySuperNode(address _nodeAddress) {
+        require(getBool(keccak256(abi.encodePacked("node.super", _nodeAddress))), "Invalid super node");
+        _;
+    }
 
 
     /**

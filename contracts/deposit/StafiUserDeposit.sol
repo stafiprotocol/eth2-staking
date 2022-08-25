@@ -10,7 +10,7 @@ import "../interfaces/deposit/IStafiUserDeposit.sol";
 import "../interfaces/pool/IStafiStakingPool.sol";
 import "../interfaces/pool/IStafiStakingPoolQueue.sol";
 import "../interfaces/token/IRETHToken.sol";
-import "../interfaces/node/ISuperNode.sol";
+import "../interfaces/node/IStafiSuperNode.sol";
 
 // Accepts user deposits and mints rETH; handles assignment of deposited ETH to pools
 contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer {
@@ -93,6 +93,13 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         // Process deposit
         processDeposit();
     }
+    // Recycle a deposit from fee collector
+    function recycleDistributerDeposit() override external payable onlyLatestContract("stafiUserDeposit", address(this)) onlyLatestContract("stafiDistributer", msg.sender) {
+        // Emit deposit recycled event
+        emit DepositRecycled(msg.sender, msg.value, block.timestamp);
+        // Process deposit
+        processDeposit();
+    }
 
     // Process a deposit
     function processDeposit() private {
@@ -145,9 +152,9 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
     }
 
     // Withdraw excess deposit pool balance for super node
-    function withdrawEth(uint256 _amount) override external onlyLatestContract("stafiUserDeposit", address(this)) onlyLatestContract("superNode", msg.sender) {
+    function withdrawExcessBalanceForSuperNode(uint256 _amount) override external onlyLatestContract("stafiUserDeposit", address(this)) onlyLatestContract("stafiSuperNode", msg.sender) {
         // Load contracts
-        ISuperNode superNode = ISuperNode(getContractAddress("superNode"));
+        IStafiSuperNode superNode = IStafiSuperNode(getContractAddress("stafiSuperNode"));
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
         // Check amount
         require(_amount <= getExcessBalance(), "Insufficient balance for withdrawal");

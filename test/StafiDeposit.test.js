@@ -11,6 +11,8 @@ describe("StafiDeposit", function () {
         this.AccountNode1 = this.signers[2]
         this.AccountTrustNode1 = this.signers[3]
         this.AccountWithdrawer1 = this.signers[4]
+        this.AccountUser2 = this.signers[5]
+        this.AccountSuperNode1 = this.signers[6]
 
 
 
@@ -19,9 +21,11 @@ describe("StafiDeposit", function () {
 
         this.FactoryStafiNetworkBalances = await ethers.getContractFactory("StafiNetworkBalances", this.AccountAdmin)
         this.FactoryStafiNetworkWithdrawal = await ethers.getContractFactory("StafiNetworkWithdrawal", this.AccountAdmin)
+        this.FactoryStafiDistributer = await ethers.getContractFactory("StafiDistributer", this.AccountAdmin)
+        this.FactoryStafiFeePool = await ethers.getContractFactory("StafiFeePool", this.AccountAdmin)
 
         this.FactoryStafiNodeManager = await ethers.getContractFactory("StafiNodeManager", this.AccountAdmin)
-        this.FactorySuperNode = await ethers.getContractFactory("SuperNode", this.AccountAdmin)
+        this.FactoryStafiSuperNode = await ethers.getContractFactory("StafiSuperNode", this.AccountAdmin)
 
         this.FactoryStafiStakingPoolQueue = await ethers.getContractFactory("StafiStakingPoolQueue", this.AccountAdmin)
         this.FactoryStafiStakingPoolManager = await ethers.getContractFactory("StafiStakingPoolManager", this.AccountAdmin)
@@ -118,10 +122,10 @@ describe("StafiDeposit", function () {
         console.log("contract stafiNodeManager address: ", this.ContractStafiNodeManager.address)
         await this.ContractStafiUpgrade.addContract("stafiNodeManager", this.ContractStafiNodeManager.address)
 
-        this.ContractSuperNode = await this.FactorySuperNode.deploy(this.ContractStafiStorage.address)
-        await this.ContractSuperNode.deployed()
-        console.log("contract superNode address: ", this.ContractSuperNode.address)
-        await this.ContractStafiUpgrade.addContract("superNode", this.ContractSuperNode.address)
+        this.ContractStafiSuperNode = await this.FactoryStafiSuperNode.deploy(this.ContractStafiStorage.address)
+        await this.ContractStafiSuperNode.deployed()
+        console.log("contract stafiSuperNode address: ", this.ContractStafiSuperNode.address)
+        await this.ContractStafiUpgrade.addContract("stafiSuperNode", this.ContractStafiSuperNode.address)
 
 
 
@@ -134,6 +138,16 @@ describe("StafiDeposit", function () {
         await this.ContractStafiNetworkWithdrawal.deployed()
         console.log("contract stafiNetworkWithdrawal address: ", this.ContractStafiNetworkWithdrawal.address)
         await this.ContractStafiUpgrade.addContract("stafiNetworkWithdrawal", this.ContractStafiNetworkWithdrawal.address)
+
+        this.ContractStafiDistributer = await this.FactoryStafiDistributer.deploy(this.ContractStafiStorage.address)
+        await this.ContractStafiDistributer.deployed()
+        console.log("contract stafi distributer address: ", this.ContractStafiDistributer.address)
+        await this.ContractStafiUpgrade.addContract("stafiDistributer", this.ContractStafiDistributer.address)
+        
+        this.ContractStafiFeePool = await this.FactoryStafiFeePool.deploy(this.ContractStafiStorage.address)
+        await this.ContractStafiFeePool.deployed()
+        console.log("contract stafi fee pool address: ", this.ContractStafiFeePool.address)
+        await this.ContractStafiUpgrade.addContract("stafiFeePool", this.ContractStafiFeePool.address)
 
 
 
@@ -156,6 +170,7 @@ describe("StafiDeposit", function () {
 
 
         await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeTrusted(this.AccountTrustNode1.address, true)
+        await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeSuper(this.AccountSuperNode1.address, true)
 
     })
 
@@ -275,11 +290,21 @@ describe("StafiDeposit", function () {
         let depositDataRoot = beacon.getDepositDataRoot(depositDataInStake);
         let depositDataRoot2 = beacon.getDepositDataRoot(depositDataInStake2);
 
-        let nodeStakeTx = await this.ContractSuperNode.connect(this.AccountTrustNode1).stake(
+        let nodeStakeTx = await this.ContractStafiSuperNode.connect(this.AccountSuperNode1).stake(
             [depositDataInStake.pubkey, depositDataInStake2.pubkey], [depositDataInStake.signature, depositDataInStake2.signature], [depositDataRoot, depositDataRoot2])
         let nodeStakeTxRecipient = await nodeStakeTx.wait()
         console.log("node deposit tx gas: ", nodeStakeTxRecipient.gasUsed.toString())
+    })
 
-
+    it("stafi distributer should distribute fee success", async function () {
+        console.log("latest block: ", await time.latestBlock())
+        await this.AccountUser1.sendTransaction({
+            to: this.ContractStafiFeePool.address,
+            value: web3.utils.toWei("38", "ether")
+        })
+        // user deposit
+        let distributeFeeTx = await this.ContractStafiDistributer.connect(this.AccountUser2).distributeFee(web3.utils.toWei("35", "ether"), { from: this.AccountUser2.address })
+        let distributeTxRecipient = await distributeFeeTx.wait()
+        console.log("distribute fee tx gas: ", distributeTxRecipient.gasUsed.toString())
     })
 })

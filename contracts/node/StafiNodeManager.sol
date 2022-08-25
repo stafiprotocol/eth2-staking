@@ -12,6 +12,7 @@ contract StafiNodeManager is StafiBase, IStafiNodeManager {
     // Events
     event NodeRegistered(address indexed node, uint256 time);
     event NodeTrustedSet(address indexed node, bool trusted, uint256 time);
+    event NodeSuperSet(address indexed node, bool trusted, uint256 time);
 
     // Construct
     constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
@@ -52,6 +53,23 @@ contract StafiNodeManager is StafiBase, IStafiNodeManager {
         return getBool(keccak256(abi.encodePacked("node.trusted", _nodeAddress)));
     }
 
+    // Get the number of super nodes in the network
+    function getSuperNodeCount() override public view returns (uint256) {
+        IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
+        return addressSetStorage.getCount(keccak256(abi.encodePacked("nodes.super.index")));
+    }
+
+    // Get a trusted node address by index
+    function getSuperNodeAt(uint256 _index) override public view returns (address) {
+        IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
+        return addressSetStorage.getItem(keccak256(abi.encodePacked("nodes.super.index")), _index);
+    }
+
+    // Check whether a node is trusted
+    function getSuperNodeExists(address _nodeAddress) override public view returns (bool) {
+        return getBool(keccak256(abi.encodePacked("node.super", _nodeAddress)));
+    }
+
     // Register a new node
     function registerNode(address _nodeAddress) override external onlyLatestContract("stafiNodeManager", address(this)) onlyLatestContract("stafiNodeDeposit", msg.sender) {
         if (!getBool(keccak256(abi.encodePacked("node.exists", _nodeAddress)))) {
@@ -81,6 +99,22 @@ contract StafiNodeManager is StafiBase, IStafiNodeManager {
         else { addressSetStorage.removeItem(keccak256(abi.encodePacked("nodes.trusted.index")), _nodeAddress); }
         // Emit node trusted set event
         emit NodeTrustedSet(_nodeAddress, _trusted, block.timestamp);
+    }
+    
+    // Set a node's super status
+    // Only accepts calls from super users
+    function setNodeSuper(address _nodeAddress, bool _super) override external onlyLatestContract("stafiNodeManager", address(this)) onlySuperUser {
+        // Check current node status
+        require(getBool(keccak256(abi.encodePacked("node.super", _nodeAddress))) != _super, "The node's super status is already set");
+        // Load contracts
+        IAddressSetStorage addressSetStorage = IAddressSetStorage(getContractAddress("addressSetStorage"));
+        // Set status
+        setBool(keccak256(abi.encodePacked("node.super", _nodeAddress)), _super);
+        // Add node to / remove node from trusted index
+        if (_super) { addressSetStorage.addItem(keccak256(abi.encodePacked("nodes.super.index")), _nodeAddress); }
+        else { addressSetStorage.removeItem(keccak256(abi.encodePacked("nodes.super.index")), _nodeAddress); }
+        // Emit node trusted set event
+        emit NodeSuperSet(_nodeAddress, _super, block.timestamp);
     }
 
 }

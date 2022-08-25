@@ -8,7 +8,8 @@ interface IStafiUserDeposit {
     function deposit() external payable;
     function recycleDissolvedDeposit() external payable;
     function recycleWithdrawnDeposit() external payable;
+    function recycleDistributerDeposit() external payable;
     function assignDeposits() external;
     function withdrawExcessBalance(uint256 _amount) external;
-    function withdrawEth(uint256 _amount) external;
+    function withdrawExcessBalanceForSuperNode(uint256 _amount) external;
 }
