@@ -3,7 +3,7 @@ pragma solidity 0.7.6;
 // SPDX-License-Identifier: GPL-3.0-only
 
 import "../StafiBase.sol";
-import "../interfaces/network/IStafiFeePool.sol";
+import "../interfaces/reward/IStafiFeePool.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
 contract StafiFeePool is StafiBase, IStafiFeePool {

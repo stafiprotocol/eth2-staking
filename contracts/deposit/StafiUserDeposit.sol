@@ -94,7 +94,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         processDeposit();
     }
     // Recycle a deposit from fee collector
-    function recycleDistributerDeposit() override external payable onlyLatestContract("stafiUserDeposit", address(this)) onlyLatestContract("stafiDistributer", msg.sender) {
+    function recycleDistributorDeposit() override external payable onlyLatestContract("stafiUserDeposit", address(this)) onlyLatestContract("stafiDistributor", msg.sender) {
         // Emit deposit recycled event
         emit DepositRecycled(msg.sender, msg.value, block.timestamp);
         // Process deposit

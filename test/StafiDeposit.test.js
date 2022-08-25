@@ -21,8 +21,9 @@ describe("StafiDeposit", function () {
 
         this.FactoryStafiNetworkBalances = await ethers.getContractFactory("StafiNetworkBalances", this.AccountAdmin)
         this.FactoryStafiNetworkWithdrawal = await ethers.getContractFactory("StafiNetworkWithdrawal", this.AccountAdmin)
-        this.FactoryStafiDistributer = await ethers.getContractFactory("StafiDistributer", this.AccountAdmin)
+        this.FactoryStafiDistributor = await ethers.getContractFactory("StafiDistributor", this.AccountAdmin)
         this.FactoryStafiFeePool = await ethers.getContractFactory("StafiFeePool", this.AccountAdmin)
+        this.FactoryStafiSuperNodeFeePool = await ethers.getContractFactory("StafiSuperNodeFeePool", this.AccountAdmin)
 
         this.FactoryStafiNodeManager = await ethers.getContractFactory("StafiNodeManager", this.AccountAdmin)
         this.FactoryStafiSuperNode = await ethers.getContractFactory("StafiSuperNode", this.AccountAdmin)
@@ -139,15 +140,20 @@ describe("StafiDeposit", function () {
         console.log("contract stafiNetworkWithdrawal address: ", this.ContractStafiNetworkWithdrawal.address)
         await this.ContractStafiUpgrade.addContract("stafiNetworkWithdrawal", this.ContractStafiNetworkWithdrawal.address)
 
-        this.ContractStafiDistributer = await this.FactoryStafiDistributer.deploy(this.ContractStafiStorage.address)
-        await this.ContractStafiDistributer.deployed()
-        console.log("contract stafi distributer address: ", this.ContractStafiDistributer.address)
-        await this.ContractStafiUpgrade.addContract("stafiDistributer", this.ContractStafiDistributer.address)
+        this.ContractStafiDistributor = await this.FactoryStafiDistributor.deploy(this.ContractStafiStorage.address)
+        await this.ContractStafiDistributor.deployed()
+        console.log("contract stafi distributor address: ", this.ContractStafiDistributor.address)
+        await this.ContractStafiUpgrade.addContract("stafiDistributor", this.ContractStafiDistributor.address)
         
         this.ContractStafiFeePool = await this.FactoryStafiFeePool.deploy(this.ContractStafiStorage.address)
         await this.ContractStafiFeePool.deployed()
         console.log("contract stafi fee pool address: ", this.ContractStafiFeePool.address)
         await this.ContractStafiUpgrade.addContract("stafiFeePool", this.ContractStafiFeePool.address)
+        
+        this.ContractStafiSuperNodeFeePool = await this.FactoryStafiSuperNodeFeePool.deploy(this.ContractStafiStorage.address)
+        await this.ContractStafiSuperNodeFeePool.deployed()
+        console.log("contract stafi super node fee pool address: ", this.ContractStafiSuperNodeFeePool.address)
+        await this.ContractStafiUpgrade.addContract("stafiSuperNodeFeePool", this.ContractStafiSuperNodeFeePool.address)
 
 
 
@@ -296,15 +302,25 @@ describe("StafiDeposit", function () {
         console.log("node deposit tx gas: ", nodeStakeTxRecipient.gasUsed.toString())
     })
 
-    it("stafi distributer should distribute fee success", async function () {
+    it("stafi distributor should distribute fee/super node fee success", async function () {
         console.log("latest block: ", await time.latestBlock())
         await this.AccountUser1.sendTransaction({
             to: this.ContractStafiFeePool.address,
-            value: web3.utils.toWei("38", "ether")
+            value: web3.utils.toWei("35", "ether")
         })
-        // user deposit
-        let distributeFeeTx = await this.ContractStafiDistributer.connect(this.AccountUser2).distributeFee(web3.utils.toWei("35", "ether"), { from: this.AccountUser2.address })
+        
+        await this.AccountUser1.sendTransaction({
+            to: this.ContractStafiSuperNodeFeePool.address,
+            value: web3.utils.toWei("3", "ether")
+        })
+        // distribute fee
+        let distributeFeeTx = await this.ContractStafiDistributor.connect(this.AccountUser2).distributeFee(web3.utils.toWei("35", "ether"), { from: this.AccountUser2.address })
         let distributeTxRecipient = await distributeFeeTx.wait()
         console.log("distribute fee tx gas: ", distributeTxRecipient.gasUsed.toString())
+        
+        // distribute fee
+        let distributeSuperNodeFeeTx = await this.ContractStafiDistributor.connect(this.AccountUser2).distributeSuperNodeFee(web3.utils.toWei("3", "ether"), { from: this.AccountUser2.address })
+        let distributeSuperNodeFeeTxRecipient = await distributeSuperNodeFeeTx.wait()
+        console.log("distribute super node fee tx gas: ", distributeSuperNodeFeeTxRecipient.gasUsed.toString())
     })
 })
