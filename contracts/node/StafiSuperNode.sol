@@ -5,10 +5,10 @@ pragma abicoder v2;
 
 import "../StafiBase.sol";
 import "../interfaces/node/IStafiSuperNode.sol";
-import "../interfaces/storage/IAddressSetStorage.sol";
 import "../interfaces/deposit/IStafiUserDeposit.sol";
 import "../interfaces/eth/IDepositContract.sol";
 import "../interfaces/settings/IStafiNetworkSettings.sol";
+import "../interfaces/storage/IPubkeySetStorage.sol";
 
 contract StafiSuperNode is StafiBase, IStafiSuperNode {
 
@@ -58,7 +58,24 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
     // Set a super node's validator pubkey
     function setSuperNodePubkey(bytes calldata _pubkey) private onlyLatestContract("stafiSuperNode", address(this)){
         require(!getBool(keccak256(abi.encodePacked("superNode.pubkey.exists", _pubkey))), "superNode pubkey exists");
+        require(getAddress(keccak256(abi.encodePacked("validator.stakingpool", _pubkey))) == address(0x0),"stakingpool pubkey exists");
         // Set validator pubkey
         setBool(keccak256(abi.encodePacked("superNode.pubkey.exists", _pubkey)), true);
+
+        PubkeySetStorage().addItem(keccak256(abi.encodePacked("superNode.pubkeys.index", msg.sender)), _pubkey);
+    }
+
+    function PubkeySetStorage() public view returns (IPubkeySetStorage) {
+        return IPubkeySetStorage(getContractAddress("pubkeySetStorage"));
+    }
+
+    // Get the number of pubkeys owned by a super node
+    function getSuperNodePubkeyCount(address _nodeAddress) override public view returns (uint256) {
+        return PubkeySetStorage().getCount(keccak256(abi.encodePacked("superNode.pubkeys.index", _nodeAddress)));
+    }
+
+    // Get a super node pubkey  by index
+    function getSuperNodePubkeyAt(address _nodeAddress, uint256 _index) override public view returns (bytes memory) {
+        return PubkeySetStorage().getItem(keccak256(abi.encodePacked("superNode.pubkeys.index", _nodeAddress)), _index);
     }
 }

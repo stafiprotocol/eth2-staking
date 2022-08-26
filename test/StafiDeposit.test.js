@@ -38,6 +38,7 @@ describe("StafiDeposit", function () {
 
         this.FactoryStafiStorage = await ethers.getContractFactory("StafiStorage", this.AccountAdmin)
         this.FactoryAddressSetStorage = await ethers.getContractFactory("AddressSetStorage", this.AccountAdmin)
+        this.FactoryPubkeySetStorage = await ethers.getContractFactory("PubkeySetStorage", this.AccountAdmin)
         this.FactoryAddressQueueStorage = await ethers.getContractFactory("AddressQueueStorage", this.AccountAdmin)
 
         this.FactoryDepositContract = await ethers.getContractFactory("DepositContract", this.AccountAdmin)
@@ -82,6 +83,11 @@ describe("StafiDeposit", function () {
         await this.ContractAddressSetStorage.deployed()
         console.log("contract addressSetStorage address: ", this.ContractAddressSetStorage.address)
         await this.ContractStafiUpgrade.addContract("addressSetStorage", this.ContractAddressSetStorage.address)
+
+        this.ContractPubkeySetStorage = await this.FactoryPubkeySetStorage.deploy(this.ContractStafiStorage.address)
+        await this.ContractPubkeySetStorage.deployed()
+        console.log("contract pubkeySetStorage address: ", this.ContractPubkeySetStorage.address)
+        await this.ContractStafiUpgrade.addContract("pubkeySetStorage", this.ContractPubkeySetStorage.address)
 
         this.ContractAddressQueueStorage = await this.FactoryAddressQueueStorage.deploy(this.ContractStafiStorage.address)
         await this.ContractAddressQueueStorage.deployed()
@@ -144,12 +150,12 @@ describe("StafiDeposit", function () {
         await this.ContractStafiDistributor.deployed()
         console.log("contract stafi distributor address: ", this.ContractStafiDistributor.address)
         await this.ContractStafiUpgrade.addContract("stafiDistributor", this.ContractStafiDistributor.address)
-        
+
         this.ContractStafiFeePool = await this.FactoryStafiFeePool.deploy(this.ContractStafiStorage.address)
         await this.ContractStafiFeePool.deployed()
         console.log("contract stafi fee pool address: ", this.ContractStafiFeePool.address)
         await this.ContractStafiUpgrade.addContract("stafiFeePool", this.ContractStafiFeePool.address)
-        
+
         this.ContractStafiSuperNodeFeePool = await this.FactoryStafiSuperNodeFeePool.deploy(this.ContractStafiStorage.address)
         await this.ContractStafiSuperNodeFeePool.deployed()
         console.log("contract stafi super node fee pool address: ", this.ContractStafiSuperNodeFeePool.address)
@@ -275,10 +281,13 @@ describe("StafiDeposit", function () {
         console.log("latest block: ", await time.latestBlock())
 
         // user deposit
-        let userDepositTx = await this.ContractStafiUserDeposit.connect(this.AccountUser1).deposit({ from: this.AccountUser1.address, value: web3.utils.toWei('64', 'ether') })
+        let userDepositTx = await this.ContractStafiUserDeposit.connect(this.AccountUser1).deposit({ from: this.AccountUser1.address, value: web3.utils.toWei('68', 'ether') })
         let userDepositTxRecipient = await userDepositTx.wait()
         console.log("user deposit tx gas: ", userDepositTxRecipient.gasUsed.toString())
 
+        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("68", 'ether'))
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
+        expect((await this.ContractRETHToken.balanceOf(this.AccountUser1.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
         // node deposit
         let depositDataInStake = {
             pubkey: beacon.getValidatorPubkey(),
@@ -299,16 +308,24 @@ describe("StafiDeposit", function () {
         let nodeStakeTx = await this.ContractStafiSuperNode.connect(this.AccountSuperNode1).stake(
             [depositDataInStake.pubkey, depositDataInStake2.pubkey], [depositDataInStake.signature, depositDataInStake2.signature], [depositDataRoot, depositDataRoot2])
         let nodeStakeTxRecipient = await nodeStakeTx.wait()
-        console.log("node deposit tx gas: ", nodeStakeTxRecipient.gasUsed.toString())
+        console.log("super node stake tx gas: ", nodeStakeTxRecipient.gasUsed.toString())
+
+        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("4", 'ether'))
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("4", "ether"));
+
+        expect((await this.ContractStafiSuperNode.getSuperNodePubkeyCount(this.AccountSuperNode1.address)).toString()).to.equal("2")
+        expect((await this.ContractStafiSuperNode.getSuperNodePubkeyAt(this.AccountSuperNode1.address, 0))).to.equal("0x" + depositDataInStake.pubkey.toString("hex"))
+        expect((await this.ContractStafiSuperNode.getSuperNodePubkeyAt(this.AccountSuperNode1.address, 1))).to.equal("0x" + depositDataInStake2.pubkey.toString("hex"))
+
     })
 
     it("stafi distributor should distribute fee/super node fee success", async function () {
         console.log("latest block: ", await time.latestBlock())
         await this.AccountUser1.sendTransaction({
             to: this.ContractStafiFeePool.address,
-            value: web3.utils.toWei("35", "ether")
+            value: web3.utils.toWei("38", "ether")
         })
-        
+
         await this.AccountUser1.sendTransaction({
             to: this.ContractStafiSuperNodeFeePool.address,
             value: web3.utils.toWei("3", "ether")
@@ -317,10 +334,24 @@ describe("StafiDeposit", function () {
         let distributeFeeTx = await this.ContractStafiDistributor.connect(this.AccountUser2).distributeFee(web3.utils.toWei("35", "ether"), { from: this.AccountUser2.address })
         let distributeTxRecipient = await distributeFeeTx.wait()
         console.log("distribute fee tx gas: ", distributeTxRecipient.gasUsed.toString())
-        
+
+        // users: (35-35*1/10)*7/8*9/10 = 24.80625
+        // node+platform:  10.19375
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("24.80625", "ether"));
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("10.19375", "ether"));
+        expect((await ethers.provider.getBalance(this.ContractStafiFeePool.address)).toString()).to.equal(web3.utils.toWei("3", "ether"));
+
         // distribute fee
         let distributeSuperNodeFeeTx = await this.ContractStafiDistributor.connect(this.AccountUser2).distributeSuperNodeFee(web3.utils.toWei("3", "ether"), { from: this.AccountUser2.address })
         let distributeSuperNodeFeeTxRecipient = await distributeSuperNodeFeeTx.wait()
         console.log("distribute super node fee tx gas: ", distributeSuperNodeFeeTxRecipient.gasUsed.toString())
+
+        // users: (3-3*1/10)*9/10 = 2.43
+        // node+platform: 0.57
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("27.23625", "ether"));
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("10.76375", "ether"));
+        expect((await ethers.provider.getBalance(this.ContractStafiSuperNodeFeePool.address)).toString()).to.equal(web3.utils.toWei("0", "ether"));
+
+
     })
 })
