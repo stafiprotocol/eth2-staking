@@ -20,6 +20,11 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer {
     constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         version = 1;
     }
+
+    // Node deposits currently amount
+    function getCurrentNodeDepositAmount() public view returns (uint256) {
+        return getUint("settings.node.deposit.amount");
+    }
     
     receive() external payable {}
 
@@ -83,9 +88,5 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer {
             stafiEther.depositEther{value: nodeAndPlatformFee}();
         }
     }
-
-    // Node deposits currently amount
-    function getCurrentNodeDepositAmount() public view returns (uint256) {
-        return getUint("settings.node.deposit.amount");
-    }
+    
 }

@@ -1,5 +1,4 @@
 pragma solidity 0.7.6;
-pragma abicoder v2;
 
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -167,17 +166,9 @@ contract StafiStakingPoolDelegate is StafiStakingPoolStorage, IStafiStakingPool 
         if (status == StakingPoolStatus.Initialized) { setStatus(StakingPoolStatus.Prelaunch); }
     }
 
-
-    function stake(bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external onlyStakingPoolOwner(msg.sender) onlyInitialised {
-        require(_validatorSignatures.length == _depositDataRoots.length);
-
-        for (uint256 i = 0; i < _validatorSignatures.length; i++) {
-            _stake(_validatorSignatures[i], _depositDataRoots[i]);
-        }
-    }
     // Progress the staking pool to staking, sending its ETH deposit to the VRC
     // Only accepts calls from the staking pool owner (node)
-    function _stake(bytes calldata _validatorSignature, bytes32 _depositDataRoot) private {
+    function stake(bytes calldata _validatorSignature, bytes32 _depositDataRoot) override external onlyLatestContract("stafiNodeDeposit", msg.sender) onlyInitialised{
         // Check current status
         require(status == StakingPoolStatus.Prelaunch, "status unmatch");
         // Check withdrawCredentials match

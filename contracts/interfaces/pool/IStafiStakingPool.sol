@@ -1,5 +1,4 @@
 pragma solidity 0.7.6;
-pragma abicoder v2;
 // SPDX-License-Identifier: GPL-3.0-only
 
 import "../../types/DepositType.sol";
@@ -25,7 +24,7 @@ interface IStafiStakingPool {
     function getPlatformDepositBalance() external view returns (uint256);
     function nodeDeposit(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) external payable;
     function userDeposit() external payable;
-    function stake(bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) external;
+    function stake(bytes calldata _validatorSignature, bytes32 _depositDataRoot)  external;
     function refund() external;
     function dissolve() external;
     function close() external;

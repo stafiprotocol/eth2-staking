@@ -5,4 +5,5 @@ pragma abicoder v2;
 
 interface IStafiNodeDeposit {
     function deposit(bytes[] calldata _validatorPubkeys, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) external payable;
+    function stake(address[] calldata _stakingPools, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) external;
 }

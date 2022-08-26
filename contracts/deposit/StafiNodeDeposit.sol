@@ -33,7 +33,7 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
     }
 
     function deposit(bytes[] calldata _validatorPubkeys, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external payable onlyLatestContract("stafiNodeDeposit", address(this)) {
-        require(_validatorPubkeys.length == _validatorSignatures.length && _validatorPubkeys.length == _depositDataRoots.length);
+        require(_validatorPubkeys.length == _validatorSignatures.length && _validatorPubkeys.length == _depositDataRoots.length, "params len err");
         require(msg.value == getCurrentNodeDepositAmount().mul(_validatorPubkeys.length), "Invalid node deposit amount");
 
         for (uint256 i = 0; i < _validatorPubkeys.length; i++) {
@@ -74,6 +74,15 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
         stakingPool.nodeDeposit{value: depositValue}(_validatorPubkey, _validatorSignature, _depositDataRoot);
         // Assign deposits if enabled
         stafiUserDeposit.assignDeposits();
+    }
+
+    function stake(address[] calldata _stakingPools, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external onlyLatestContract("stafiNodeDeposit", address(this)) {
+        require(_validatorSignatures.length == _depositDataRoots.length && _stakingPools.length == _validatorSignatures.length, "params len err");
+
+        for (uint256 i = 0; i < _validatorSignatures.length; i++) {
+            IStafiStakingPool stakingPool = IStafiStakingPool(_stakingPools[i]);
+            stakingPool.stake(_validatorSignatures[i], _depositDataRoots[i]);
+        }
     }
 
     // Node deposits currently enabled

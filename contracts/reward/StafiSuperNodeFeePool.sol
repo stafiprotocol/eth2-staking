@@ -6,6 +6,7 @@ import "../StafiBase.sol";
 import "../interfaces/reward/IStafiFeePool.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
+// receive priority fee
 contract StafiSuperNodeFeePool is StafiBase, IStafiFeePool {
 
     // Libs
