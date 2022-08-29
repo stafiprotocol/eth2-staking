@@ -1,6 +1,10 @@
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 const { ethers, web3 } = require("hardhat")
 const { expect } = require("chai")
 const { time, beacon } = require("./utilities")
+var balance_tree_1 = __importDefault(require("./src/balance-tree"));
 
 describe("StafiDeposit", function () {
     before(async function () {
@@ -13,6 +17,8 @@ describe("StafiDeposit", function () {
         this.AccountWithdrawer1 = this.signers[4]
         this.AccountUser2 = this.signers[5]
         this.AccountSuperNode1 = this.signers[6]
+        this.AccountNode2 = this.signers[7]
+        this.AccountNode3 = this.signers[8]
 
 
 
@@ -281,14 +287,20 @@ describe("StafiDeposit", function () {
         // check state
         expect((await ethers.provider.getBalance(stakingPoolAddress)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
         expect(await contractStakingPool.getStatus()).to.equal(2)
-        
+        expect(await contractStakingPool.getStatus()).to.equal(2)
+
         expect((await ethers.provider.getBalance(stakingPoolAddress2)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
         expect(await contractStakingPool2.getStatus()).to.equal(2)
 
-
-        expect((await ethers.provider.getBalance(this.ContractStafiNetworkWithdrawal.address)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
         expect((await ethers.provider.getBalance(this.ContractDepositContract.address)).toString()).to.equal(web3.utils.toWei("64", 'ether'))
 
+        expect((await this.ContractStafiStakingPoolManager.getNodeStakingPoolCount(this.AccountNode1.address)).toString()).to.equal("2")
+        expect((await this.ContractStafiStakingPoolManager.getNodeStakingPoolAt(this.AccountNode1.address, 0))).to.equal(stakingPoolAddress)
+        expect((await this.ContractStafiStakingPoolManager.getNodeStakingPoolAt(this.AccountNode1.address, 1))).to.equal(stakingPoolAddress2)
+
+
+
+        // expect((await ethers.provider.getBalance(this.ContractStafiNetworkWithdrawal.address)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
         // start: total 32eth, node 4eth, users 28eth 
         // end: total 38eth, platform 0.6eth, node 4 + 5.4*1/8 + 5.4*7/8*1/10 = 5.1475, users 28 + 5.4*7/8*9/10 = 32.2525
         // send deposit and reward eth to StafiNetworkWithdrawal contract
@@ -348,6 +360,7 @@ describe("StafiDeposit", function () {
 
         expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("4", 'ether'))
         expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("4", "ether"));
+        expect((await ethers.provider.getBalance(this.ContractDepositContract.address)).toString()).to.equal(web3.utils.toWei("64", 'ether'))
 
         expect((await this.ContractStafiSuperNode.getSuperNodePubkeyCount(this.AccountSuperNode1.address)).toString()).to.equal("2")
         expect((await this.ContractStafiSuperNode.getSuperNodePubkeyAt(this.AccountSuperNode1.address, 0))).to.equal("0x" + depositDataInStake.pubkey.toString("hex"))
@@ -388,6 +401,40 @@ describe("StafiDeposit", function () {
         expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("10.76375", "ether"));
         expect((await ethers.provider.getBalance(this.ContractStafiSuperNodeFeePool.address)).toString()).to.equal(web3.utils.toWei("0", "ether"));
 
+        let tree = new balance_tree_1.default([
+            { account: this.AccountNode1.address, amount: web3.utils.toWei("1", "ether") },
+            { account: this.AccountNode2.address, amount: web3.utils.toWei("2", "ether") },
+            { account: this.AccountNode2.address, amount: web3.utils.toWei("3", "ether") },
+            { account: this.AccountNode2.address, amount: web3.utils.toWei("4", "ether") },
+        ]);
 
+        console.log("root: ", tree.getHexRoot());
+
+        // set merkle root
+        let setMerkleRootTx = await this.ContractStafiDistributor.connect(this.AccountAdmin).setMerkleRoot(0, tree.getHexRoot(), { from: this.AccountAdmin.address })
+        let setMerkleRootTxRecepient = await setMerkleRootTx.wait()
+        console.log("setMerkleRoot  tx gas: ", setMerkleRootTxRecepient.gasUsed.toString())
+
+        let proof = tree.getProof(0, this.AccountNode1.address, web3.utils.toWei("1", "ether"))
+        let proof2 = tree.getProof(1, this.AccountNode2.address, web3.utils.toWei("2", "ether"))
+
+        expect((await this.ContractStafiDistributor.isClaimed(0, 0))).to.equal(false);
+        expect((await this.ContractStafiDistributor.isClaimed(0, 1))).to.equal(false);
+        let node1Balance = await ethers.provider.getBalance(this.AccountNode1.address)
+        let node2Balance = await ethers.provider.getBalance(this.AccountNode2.address)
+
+        // claim
+        let claimTx = await this.ContractStafiDistributor.connect(this.AccountUser1).claim([0, 0], [0, 1], [this.AccountNode1.address, this.AccountNode2.address],
+            [web3.utils.toWei("1", "ether"), web3.utils.toWei("2", "ether")], [proof, proof2], { from: this.AccountUser1.address })
+        let claimTxRecepient = await claimTx.wait()
+        console.log("claim tx gas: ", claimTxRecepient.gasUsed.toString())
+
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("7.76375", "ether"));
+        expect((await ethers.provider.getBalance(this.AccountNode1.address)).sub(node1Balance).toString()).to.equal(web3.utils.toWei("1", "ether"));
+        expect((await ethers.provider.getBalance(this.AccountNode2.address)).sub(node2Balance).toString()).to.equal(web3.utils.toWei("2", "ether"));
+
+        expect((await this.ContractStafiDistributor.isClaimed(0, 0))).to.equal(true);
+        expect((await this.ContractStafiDistributor.isClaimed(0, 1))).to.equal(true);
+        expect((await this.ContractStafiDistributor.isClaimed(0, 2))).to.equal(false);
     })
 })

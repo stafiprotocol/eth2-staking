@@ -1,7 +1,7 @@
 pragma solidity 0.7.6;
+pragma abicoder v2;
 
 // SPDX-License-Identifier: GPL-3.0-only
-
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../StafiBase.sol";
 import "../interfaces/IStafiEther.sol";
@@ -10,17 +10,19 @@ import "../interfaces/settings/IStafiNetworkSettings.sol";
 import "../interfaces/reward/IStafiFeePool.sol";
 import "../interfaces/reward/IStafiSuperNodeFeePool.sol";
 import "../interfaces/IStafiEtherWithdrawer.sol";
+import "@openzeppelin/contracts/cryptography/MerkleProof.sol";
 
 // Handles network validator priority fees
 contract StafiDistributor is StafiBase, IStafiEtherWithdrawer {
     // Libs
     using SafeMath for uint256;
     
+    event Claimed(uint256 round, uint256 index, address account, uint256 amount);
     // Construct
     constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         version = 1;
     }
-
+    
     // Node deposits currently amount
     function getCurrentNodeDepositAmount() public view returns (uint256) {
         return getUint("settings.node.deposit.amount");
@@ -87,6 +89,54 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer {
         if (nodeAndPlatformFee > 0) {
             stafiEther.depositEther{value: nodeAndPlatformFee}();
         }
+    }
+
+    function setMerkleRoot(uint256 claimRound, bytes32 merkleRoot) public onlySuperUser {
+        setBytes32(keccak256(abi.encodePacked('rewards.claimed.merkleRoot', claimRound)), merkleRoot);
+    }
+
+    function claim(uint256[] calldata claimRoundList, uint256[] calldata indexList, address[] calldata accountList, uint256[] calldata amountList, bytes32[][] calldata merkleProofList) external onlyLatestContract("stafiDistributor", address(this)) {
+        uint256 len = claimRoundList.length;
+        require(len == indexList.length && len == accountList.length && len == amountList.length && len == merkleProofList.length, "params len err");
+
+        for (uint256 i = 0; i< len; i++) {
+            _claim(claimRoundList[i], indexList[i], accountList[i], amountList[i], merkleProofList[i]);
+        }
+    }
+
+    function isClaimed(uint256 claimRound, uint256 index) public view returns (bool) {
+        uint256 claimedWordIndex = index / 256;
+        uint256 claimedBitIndex = index % 256;
+        uint256 claimedWord = getUint(keccak256(abi.encodePacked('rewards.claimed.bitMap', claimRound, claimedWordIndex)));
+        uint256 mask = (1 << claimedBitIndex);
+        return claimedWord & mask == mask;
+    }
+
+    function _setClaimed(uint256 claimRound, uint256 index) private {
+        uint256 claimedWordIndex = index / 256;
+        uint256 claimedBitIndex = index % 256;
+        uint256 claimedWord = getUint(keccak256(abi.encodePacked('rewards.claimed.bitMap', claimRound, claimedWordIndex)));
+        claimedWord = claimedWord | (1 << claimedBitIndex);
+        setUint(keccak256(abi.encodePacked('rewards.claimed.bitMap', claimRound, claimedWordIndex)), claimedWord);
+    }
+
+    function _claim(uint256 claimRound, uint256 index, address account, uint256 amount, bytes32[] calldata merkleProof) private {
+        require(amount > 0, "claim amount zero err");
+        require(!isClaimed(claimRound, index), 'has claimed');
+        bytes32 merkleRoot = getBytes32(keccak256(abi.encodePacked('rewards.claimed.merkleRoot', claimRound)));
+        // Verify the merkle proof.
+        bytes32 node = keccak256(abi.encodePacked(index, account, amount));
+        require(MerkleProof.verify(merkleProof, merkleRoot, node), 'Invalid proof');
+
+        // Mark it claimed and send the token.
+        _setClaimed(claimRound, index);
+
+        IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
+        stafiEther.withdrawEther(amount);
+        (bool result,) = account.call{value: amount}("");
+        require(result, "Failed to claim ETH");
+
+        emit Claimed(claimRound, index, account, amount);
     }
     
 }
