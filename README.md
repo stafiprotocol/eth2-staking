@@ -28,6 +28,8 @@ npm run compile
 # Test
 
 ```
+export ALCHEMY_API_KEY=xxxxxxxxxxxxxxxxxx
+
 npm run test
 ```
 

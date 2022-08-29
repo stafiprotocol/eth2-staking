@@ -6,11 +6,10 @@ const { expect } = require("chai")
 const { time, beacon } = require("./utilities")
 var balance_tree_1 = __importDefault(require("./src/balance-tree"));
 
-describe("StafiDeposit", function () {
+describe("upgrade test", function () {
     before(async function () {
         this.signers = await ethers.getSigners()
 
-        this.AccountAdmin = this.signers[0]
         this.AccountUser1 = this.signers[1]
         this.AccountNode1 = this.signers[2]
         this.AccountTrustNode1 = this.signers[3]
@@ -21,180 +20,133 @@ describe("StafiDeposit", function () {
         this.AccountNode3 = this.signers[8]
 
 
+        // state on mainnet
+        this.Admin = await ethers.getImpersonatedSigner("0x211bed4bd65d4c01643377d95491b8c4b533eaad");
+        console.log("admin: ", this.Admin.address);
+        await this.AccountUser1.sendTransaction({
+            to: this.Admin.address,
+            value: web3.utils.toWei("30", "ether")
+        })
 
-        this.FactoryStafiNodeDeposit = await ethers.getContractFactory("StafiNodeDeposit", this.AccountAdmin)
-        this.FactoryStafiUserDeposit = await ethers.getContractFactory("StafiUserDeposit", this.AccountAdmin)
+        this.TrustNode1 = await ethers.getImpersonatedSigner("0xEBf7e97D801d9EDD5A4027919Db55aA12681aEfe");
+        console.log("trust node1 : ", this.TrustNode1.address);
+        await this.AccountUser1.sendTransaction({
+            to: this.TrustNode1.address,
+            value: web3.utils.toWei("30", "ether")
+        })
 
-        this.FactoryStafiNetworkBalances = await ethers.getContractFactory("StafiNetworkBalances", this.AccountAdmin)
-        this.FactoryStafiNetworkWithdrawal = await ethers.getContractFactory("StafiNetworkWithdrawal", this.AccountAdmin)
-        this.FactoryStafiDistributor = await ethers.getContractFactory("StafiDistributor", this.AccountAdmin)
-        this.FactoryStafiFeePool = await ethers.getContractFactory("StafiFeePool", this.AccountAdmin)
-        this.FactoryStafiSuperNodeFeePool = await ethers.getContractFactory("StafiSuperNodeFeePool", this.AccountAdmin)
-
-        this.FactoryStafiNodeManager = await ethers.getContractFactory("StafiNodeManager", this.AccountAdmin)
-        this.FactoryStafiSuperNode = await ethers.getContractFactory("StafiSuperNode", this.AccountAdmin)
-
-        this.FactoryStafiStakingPoolQueue = await ethers.getContractFactory("StafiStakingPoolQueue", this.AccountAdmin)
-        this.FactoryStafiStakingPoolManager = await ethers.getContractFactory("StafiStakingPoolManager", this.AccountAdmin)
-        this.FactoryStafiStakingPoolDelegate = await ethers.getContractFactory("StafiStakingPoolDelegate", this.AccountAdmin)
-
-        this.FactoryStafiNetworkSettings = await ethers.getContractFactory("StafiNetworkSettings", this.AccountAdmin)
-        this.FactoryStafiStakingPoolSettings = await ethers.getContractFactory("StafiStakingPoolSettings", this.AccountAdmin)
-
-
-        this.FactoryStafiStorage = await ethers.getContractFactory("StafiStorage", this.AccountAdmin)
-        this.FactoryAddressSetStorage = await ethers.getContractFactory("AddressSetStorage", this.AccountAdmin)
-        this.FactoryPubkeySetStorage = await ethers.getContractFactory("PubkeySetStorage", this.AccountAdmin)
-        this.FactoryAddressQueueStorage = await ethers.getContractFactory("AddressQueueStorage", this.AccountAdmin)
-
-        this.FactoryDepositContract = await ethers.getContractFactory("DepositContract", this.AccountAdmin)
-
-        this.FactoryRETHToken = await ethers.getContractFactory("RETHToken", this.AccountAdmin)
-
-        this.FactoryStafiEther = await ethers.getContractFactory("StafiEther", this.AccountAdmin)
-        this.FactoryStafiUpgrade = await ethers.getContractFactory("StafiUpgrade", this.AccountAdmin)
-    })
-
-    beforeEach(async function () {
-        this.ContractStafiStorage = await this.FactoryStafiStorage.deploy()
-        await this.ContractStafiStorage.deployed()
-        console.log("contract stafiStorate address: ", this.ContractStafiStorage.address)
-
-        this.ContractStafiUpgrade = await this.FactoryStafiUpgrade.deploy(this.ContractStafiStorage.address)
-        await this.ContractStafiUpgrade.deployed()
-        console.log("contract stafiUpgrade address: ", this.ContractStafiUpgrade.address)
-        await this.ContractStafiUpgrade.initThisContract()
+        this.StafiStorageAddress = "0x6c2f7b6110a37b3b0fbdd811876be368df02e8b0"
+        this.StafiUpgradeAddress = "0xb0da556df7c66ed429191e113974a6c474f2b389"
+        this.REthTokenAddress = "0x9559aaa82d9649c7a7b220e7c461d2e74c9a3593"
+        this.StafiNetworkSettingsAddress = "0x1a5474e63519bf47860856f03f414445382dc3f1"
+        this.DepositContractAddress = "0x00000000219ab540356cbb839cbe05303d7705fa"
+        this.StafiEtherAddress = "0x54896f542f044709807f0d79033934d661d39fc1"
 
 
-
-        this.ContractStafiEther = await this.FactoryStafiEther.deploy(this.ContractStafiStorage.address)
-        await this.ContractStafiEther.deployed()
-        console.log("contract stafiEther address: ", this.ContractStafiEther.address)
-        await this.ContractStafiUpgrade.addContract("stafiEther", this.ContractStafiEther.address)
-
-
-        this.ContractDepositContract = await this.FactoryDepositContract.deploy()
-        await this.ContractDepositContract.deployed()
-        console.log("contract depositContract address: ", this.ContractDepositContract.address)
-        await this.ContractStafiUpgrade.addContract("ethDeposit", this.ContractDepositContract.address)
+        this.ContractStafiStorage = await ethers.getContractAt("IStafiStorage", this.StafiStorageAddress)
+        this.ContractStafiUpgrade = await ethers.getContractAt("IStafiUpgrade", this.StafiUpgradeAddress)
+        this.ContractRETHToken = await ethers.getContractAt("RETHToken", this.REthTokenAddress)
+        this.ContractStafiNetworkSettings = await ethers.getContractAt("StafiNetworkSettings", this.StafiNetworkSettingsAddress)
+        this.ContractDepositContract = await ethers.getContractAt("DepositContract", this.DepositContractAddress)
+        this.ContractStafiEther = await ethers.getContractAt("StafiEther", this.StafiEtherAddress)
 
 
-        this.ContractRETHToken = await this.FactoryRETHToken.deploy(this.ContractStafiStorage.address)
-        await this.ContractRETHToken.deployed()
-        console.log("contract RETHToken address: ", this.ContractRETHToken.address)
-        await this.ContractStafiUpgrade.addContract("rETHToken", this.ContractRETHToken.address)
+        this.WithdrawalCredentials = await this.ContractStafiNetworkSettings.getWithdrawalCredentials()
+        console.log("withdrawalCredentials: ", this.WithdrawalCredentials)
+        this.NodeConsensusThreshold = await this.ContractStafiNetworkSettings.getNodeConsensusThreshold()
+        console.log("NodeConsensusThreshold: ", this.NodeConsensusThreshold.toString())
 
 
-        this.ContractAddressSetStorage = await this.FactoryAddressSetStorage.deploy(this.ContractStafiStorage.address)
-        await this.ContractAddressSetStorage.deployed()
-        console.log("contract addressSetStorage address: ", this.ContractAddressSetStorage.address)
-        await this.ContractStafiUpgrade.addContract("addressSetStorage", this.ContractAddressSetStorage.address)
-
-        this.ContractPubkeySetStorage = await this.FactoryPubkeySetStorage.deploy(this.ContractStafiStorage.address)
-        await this.ContractPubkeySetStorage.deployed()
-        console.log("contract pubkeySetStorage address: ", this.ContractPubkeySetStorage.address)
-        await this.ContractStafiUpgrade.addContract("pubkeySetStorage", this.ContractPubkeySetStorage.address)
-
-        this.ContractAddressQueueStorage = await this.FactoryAddressQueueStorage.deploy(this.ContractStafiStorage.address)
-        await this.ContractAddressQueueStorage.deployed()
-        console.log("contract addressQueueStorage address: ", this.ContractAddressQueueStorage.address)
-        await this.ContractStafiUpgrade.addContract("addressQueueStorage", this.ContractAddressQueueStorage.address)
+        console.log("contract.storage.initialised: ", (await this.ContractStafiStorage.getBool(web3.utils.soliditySha3("contract.storage.initialised"))).toString())
+        console.log("burn enabled: ", await this.ContractRETHToken.getBurnEnabled())
 
 
-
-        this.ContractStafiNetworkSettings = await this.FactoryStafiNetworkSettings.deploy(this.ContractStafiStorage.address)
-        await this.ContractStafiNetworkSettings.deployed()
-        console.log("contract stafiNetworkSettings address: ", this.ContractStafiNetworkSettings.address)
-        await this.ContractStafiUpgrade.addContract("stafiNetworkSettings", this.ContractStafiNetworkSettings.address)
-
-        this.ContractStafiStakingPoolSettings = await this.FactoryStafiStakingPoolSettings.deploy(this.ContractStafiStorage.address)
-        await this.ContractStafiStakingPoolSettings.deployed()
-        console.log("contract stafiStakingPoolSettings address: ", this.ContractStafiStakingPoolSettings.address)
-        await await this.ContractStafiUpgrade.addContract("stafiStakingPoolSettings", this.ContractStafiStakingPoolSettings.address)
+        // upgrade contracts
+        this.FactoryStafiNodeDeposit = await ethers.getContractFactory("StafiNodeDeposit", this.Admin)
+        this.ContracStafiNodeDeposit = await this.FactoryStafiNodeDeposit.deploy(this.StafiStorageAddress)
+        await this.ContracStafiNodeDeposit.deployed()
+        console.log("contract stafiNodeDeposit address: ", this.ContracStafiNodeDeposit.address)
+        await this.ContractStafiUpgrade.connect(this.Admin).upgradeContract("stafiNodeDeposit", this.ContracStafiNodeDeposit.address)
 
 
-        this.ContractStafiStakingPoolQueue = await this.FactoryStafiStakingPoolQueue.deploy(this.ContractStafiStorage.address)
-        await this.ContractStafiStakingPoolQueue.deployed()
-        console.log("contract stafiStakingPoolQueue address: ", this.ContractStafiStakingPoolQueue.address)
-        await this.ContractStafiUpgrade.addContract("stafiStakingPoolQueue", this.ContractStafiStakingPoolQueue.address)
+        this.FactoryStafiUserDeposit = await ethers.getContractFactory("StafiUserDeposit", this.Admin)
+        this.ContractStafiUserDeposit = await this.FactoryStafiUserDeposit.deploy(this.StafiStorageAddress)
+        await this.ContractStafiUserDeposit.deployed()
+        console.log("contract stafiUserDeposit address: ", this.ContractStafiUserDeposit.address)
+        await this.ContractStafiUpgrade.connect(this.Admin).upgradeContract("stafiUserDeposit", this.ContractStafiUserDeposit.address)
 
+
+        this.FactoryStafiStakingPoolManager = await ethers.getContractFactory("StafiStakingPoolManager", this.admin)
         this.ContractStafiStakingPoolManager = await this.FactoryStafiStakingPoolManager.deploy(this.ContractStafiStorage.address)
         await this.ContractStafiStakingPoolManager.deployed()
         console.log("contract stafiStakingPoolManager address: ", this.ContractStafiStakingPoolManager.address)
-        await this.ContractStafiUpgrade.addContract("stafiStakingPoolManager", this.ContractStafiStakingPoolManager.address)
+        await this.ContractStafiUpgrade.connect(this.Admin).upgradeContract("stafiStakingPoolManager", this.ContractStafiStakingPoolManager.address)
 
-        this.ContractStafiStakingPoolDelegate = await this.FactoryStafiStakingPoolDelegate.deploy()
-        await this.ContractStafiStakingPoolDelegate.deployed()
-        console.log("contract stafiStakingPoolDelegate address: ", this.ContractStafiStakingPoolDelegate.address)
-        await this.ContractStafiUpgrade.addContract("stafiStakingPoolDelegate", this.ContractStafiStakingPoolDelegate.address)
-
-
-
+        this.FactoryStafiNodeManager = await ethers.getContractFactory("StafiNodeManager", this.Admin)
         this.ContractStafiNodeManager = await this.FactoryStafiNodeManager.deploy(this.ContractStafiStorage.address)
         await this.ContractStafiNodeManager.deployed()
         console.log("contract stafiNodeManager address: ", this.ContractStafiNodeManager.address)
-        await this.ContractStafiUpgrade.addContract("stafiNodeManager", this.ContractStafiNodeManager.address)
-
-        this.ContractStafiSuperNode = await this.FactoryStafiSuperNode.deploy(this.ContractStafiStorage.address)
-        await this.ContractStafiSuperNode.deployed()
-        console.log("contract stafiSuperNode address: ", this.ContractStafiSuperNode.address)
-        await this.ContractStafiUpgrade.addContract("stafiSuperNode", this.ContractStafiSuperNode.address)
+        await this.ContractStafiUpgrade.connect(this.Admin).upgradeContract("stafiNodeManager", this.ContractStafiNodeManager.address)
 
 
+        // deploy new contracts
+        this.FactoryStafiStakingPoolDelegate = await ethers.getContractFactory("StafiStakingPoolDelegate", this.Admin)
+        this.ContractStafiStakingPoolDelegate = await this.FactoryStafiStakingPoolDelegate.deploy()
+        await this.ContractStafiStakingPoolDelegate.deployed()
+        console.log("contract stafiStakingPoolDelegate address: ", this.ContractStafiStakingPoolDelegate.address)
+        await this.ContractStafiUpgrade.connect(this.Admin).addContract("stafiStakingPoolDelegate", this.ContractStafiStakingPoolDelegate.address)
 
-        this.ContractStafiNetworkBalances = await this.FactoryStafiNetworkBalances.deploy(this.ContractStafiStorage.address)
-        await this.ContractStafiNetworkBalances.deployed()
-        console.log("contract stafiNetworkBalances address: ", this.ContractStafiNetworkBalances.address)
-        await this.ContractStafiUpgrade.addContract("stafiNetworkBalances", this.ContractStafiNetworkBalances.address)
-
-        this.ContractStafiNetworkWithdrawal = await this.FactoryStafiNetworkWithdrawal.deploy(this.ContractStafiStorage.address)
-        await this.ContractStafiNetworkWithdrawal.deployed()
-        console.log("contract stafiNetworkWithdrawal address: ", this.ContractStafiNetworkWithdrawal.address)
-        await this.ContractStafiUpgrade.addContract("stafiNetworkWithdrawal", this.ContractStafiNetworkWithdrawal.address)
-
+        this.FactoryStafiDistributor = await ethers.getContractFactory("StafiDistributor", this.Admin)
         this.ContractStafiDistributor = await this.FactoryStafiDistributor.deploy(this.ContractStafiStorage.address)
         await this.ContractStafiDistributor.deployed()
         console.log("contract stafi distributor address: ", this.ContractStafiDistributor.address)
-        await this.ContractStafiUpgrade.addContract("stafiDistributor", this.ContractStafiDistributor.address)
+        await this.ContractStafiUpgrade.connect(this.Admin).addContract("stafiDistributor", this.ContractStafiDistributor.address)
 
+        this.FactoryStafiFeePool = await ethers.getContractFactory("StafiFeePool", this.Admin)
         this.ContractStafiFeePool = await this.FactoryStafiFeePool.deploy(this.ContractStafiStorage.address)
         await this.ContractStafiFeePool.deployed()
         console.log("contract stafi fee pool address: ", this.ContractStafiFeePool.address)
-        await this.ContractStafiUpgrade.addContract("stafiFeePool", this.ContractStafiFeePool.address)
+        await this.ContractStafiUpgrade.connect(this.Admin).addContract("stafiFeePool", this.ContractStafiFeePool.address)
 
+        this.FactoryStafiSuperNodeFeePool = await ethers.getContractFactory("StafiSuperNodeFeePool", this.Admin)
         this.ContractStafiSuperNodeFeePool = await this.FactoryStafiSuperNodeFeePool.deploy(this.ContractStafiStorage.address)
         await this.ContractStafiSuperNodeFeePool.deployed()
         console.log("contract stafi super node fee pool address: ", this.ContractStafiSuperNodeFeePool.address)
-        await this.ContractStafiUpgrade.addContract("stafiSuperNodeFeePool", this.ContractStafiSuperNodeFeePool.address)
+        await this.ContractStafiUpgrade.connect(this.Admin).addContract("stafiSuperNodeFeePool", this.ContractStafiSuperNodeFeePool.address)
+
+        this.FactoryStafiSuperNode = await ethers.getContractFactory("StafiSuperNode", this.Admin)
+        this.ContractStafiSuperNode = await this.FactoryStafiSuperNode.deploy(this.ContractStafiStorage.address)
+        await this.ContractStafiSuperNode.deployed()
+        console.log("contract stafiSuperNode address: ", this.ContractStafiSuperNode.address)
+        await this.ContractStafiUpgrade.connect(this.Admin).addContract("stafiSuperNode", this.ContractStafiSuperNode.address)
+
+        this.FactoryPubkeySetStorage = await ethers.getContractFactory("PubkeySetStorage", this.Admin)
+        this.ContractPubkeySetStorage = await this.FactoryPubkeySetStorage.deploy(this.ContractStafiStorage.address)
+        await this.ContractPubkeySetStorage.deployed()
+        console.log("contract pubkeySetStorage address: ", this.ContractPubkeySetStorage.address)
+        await this.ContractStafiUpgrade.connect(this.Admin).addContract("pubkeySetStorage", this.ContractPubkeySetStorage.address)
 
 
+        // modify settings 
+        await this.ContracStafiNodeDeposit.connect(this.Admin).setDepositEnabled(true)
 
-        this.ContracStafiNodeDeposit = await this.FactoryStafiNodeDeposit.deploy(this.ContractStafiStorage.address)
-        await this.ContracStafiNodeDeposit.deployed()
-        console.log("contract stafiNodeDeposit address: ", this.ContracStafiNodeDeposit.address)
-        await this.ContractStafiUpgrade.addContract("stafiNodeDeposit", this.ContracStafiNodeDeposit.address)
+        // add super node
+        await this.ContractStafiNodeManager.connect(this.Admin).setNodeSuper(this.AccountSuperNode1.address, true)
 
-        this.ContractStafiUserDeposit = await this.FactoryStafiUserDeposit.deploy(this.ContractStafiStorage.address)
-        await this.ContractStafiUserDeposit.deployed()
-        console.log("contract stafiUserDeposit address: ", this.ContractStafiUserDeposit.address)
-        await this.ContractStafiUpgrade.addContract("stafiUserDeposit", this.ContractStafiUserDeposit.address)
-
-
-
-        await this.ContractStafiUpgrade.initStorage(true)
-
-        this.WithdrawalCredentials = '0x00d0d8e23e26afa86382b1f1e7b7af7b5d431bfa68d3b3f3c2fe2a6e54353fa8'
-        await this.ContractStafiNetworkSettings.setWithdrawalCredentials(this.WithdrawalCredentials)
-
-
-        await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeTrusted(this.AccountTrustNode1.address, true)
-        await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeSuper(this.AccountSuperNode1.address, true)
-
+        // state after upgrade
+        console.log("trustedNode count", (await this.ContractStafiNodeManager.getTrustedNodeCount()).toString())
+        console.log("trustedNode: ", (await this.ContractStafiNodeManager.getTrustedNodeAt(0)).toString())
+        console.log("trustedNode: ", (await this.ContractStafiNodeManager.getTrustedNodeAt(1)).toString())
+        console.log("trustedNode: ", (await this.ContractStafiNodeManager.getTrustedNodeAt(2)).toString())
+        console.log("trustedNode: ", (await this.ContractStafiNodeManager.getTrustedNodeAt(3)).toString())
     })
+
+
 
     it("node and user should deposit/stake success", async function () {
         console.log("latest block: ", await time.latestBlock())
-
+        console.log("depositContract balance: ", (await ethers.provider.getBalance(this.ContractDepositContract.address)).toString())
+        console.log("stafiEther balance: ", (await ethers.provider.getBalance(this.ContractStafiEther.address)).toString())
         // user deposit
         let userDepositTx = await this.ContractStafiUserDeposit.connect(this.AccountUser1).deposit({ from: this.AccountUser1.address, value: web3.utils.toWei('28', 'ether') })
         let userDepositTxRecipient = await userDepositTx.wait()
@@ -237,19 +189,19 @@ describe("StafiDeposit", function () {
         expect((await contractStakingPool.getUserDepositBalance()).toString()).to.equal(web3.utils.toWei("28", 'ether'))
         expect((await ethers.provider.getBalance(stakingPoolAddress)).toString()).to.equal(web3.utils.toWei("28", 'ether'))
 
-        expect(await contractStakingPool2.getStatus()).to.equal(0)
+        expect(await contractStakingPool2.getStatus()).to.equal(1)
         expect(await contractStakingPool2.getNodeDepositAssigned()).to.equal(true)
-        expect(await contractStakingPool2.getUserDepositAssigned()).to.equal(false)
+        expect(await contractStakingPool2.getUserDepositAssigned()).to.equal(true)
         expect(await contractStakingPool2.getWithdrawalCredentialsMatch()).to.equal(false)
         expect((await contractStakingPool2.getNodeDepositBalance()).toString()).to.equal(web3.utils.toWei("4", 'ether'))
-        expect((await contractStakingPool2.getUserDepositBalance()).toString()).to.equal(web3.utils.toWei("0", 'ether'))
-        expect((await ethers.provider.getBalance(stakingPoolAddress2)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
+        expect((await contractStakingPool2.getUserDepositBalance()).toString()).to.equal(web3.utils.toWei("28", 'ether'))
+        expect((await ethers.provider.getBalance(stakingPoolAddress2)).toString()).to.equal(web3.utils.toWei("28", 'ether'))
 
-        expect((await ethers.provider.getBalance(this.ContractDepositContract.address)).toString()).to.equal(web3.utils.toWei("8", 'ether'))
+        expect((await ethers.provider.getBalance(this.ContractDepositContract.address)).toString()).to.equal("13391231000069000000000069")
 
         // trust node vote withdrawCredentials
-        await contractStakingPool.connect(this.AccountTrustNode1).voteWithdrawCredentials()
-        await contractStakingPool2.connect(this.AccountTrustNode1).voteWithdrawCredentials()
+        await contractStakingPool.connect(this.TrustNode1).voteWithdrawCredentials()
+        await contractStakingPool2.connect(this.TrustNode1).voteWithdrawCredentials()
 
         expect(await contractStakingPool.getWithdrawalCredentialsMatch()).to.equal(true)
         expect(await contractStakingPool.getWithdrawalCredentialsMatch()).to.equal(true)
@@ -292,38 +244,14 @@ describe("StafiDeposit", function () {
         expect((await ethers.provider.getBalance(stakingPoolAddress2)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
         expect(await contractStakingPool2.getStatus()).to.equal(2)
 
-        expect((await ethers.provider.getBalance(this.ContractDepositContract.address)).toString()).to.equal(web3.utils.toWei("64", 'ether'))
+        expect((await ethers.provider.getBalance(this.ContractDepositContract.address)).toString()).to.equal("13391287000069000000000069")
 
         expect((await this.ContractStafiStakingPoolManager.getNodeStakingPoolCount(this.AccountNode1.address)).toString()).to.equal("2")
         expect((await this.ContractStafiStakingPoolManager.getNodeStakingPoolAt(this.AccountNode1.address, 0))).to.equal(stakingPoolAddress)
         expect((await this.ContractStafiStakingPoolManager.getNodeStakingPoolAt(this.AccountNode1.address, 1))).to.equal(stakingPoolAddress2)
+        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal("11210863318720567060895")
 
-
-
-        // expect((await ethers.provider.getBalance(this.ContractStafiNetworkWithdrawal.address)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
-        // start: total 32eth, node 4eth, users 28eth 
-        // end: total 38eth, platform 0.6eth, node 4 + 5.4*1/8 + 5.4*7/8*1/10 = 5.1475, users 28 + 5.4*7/8*9/10 = 32.2525
-        // send deposit and reward eth to StafiNetworkWithdrawal contract
-        // await this.AccountWithdrawer1.sendTransaction({
-        //     to: this.ContractStafiNetworkWithdrawal.address,
-        //     value: web3.utils.toWei("38", "ether")
-        // })
-
-        // expect((await ethers.provider.getBalance(this.ContractStafiNetworkWithdrawal.address)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
-        // expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("38", 'ether'))
-        // let nodeBalanceBefore = await ethers.provider.getBalance(this.AccountNode1.address)
-
-        // // distribute deposit and reward to node/users by trust node
-        // let startBalance = web3.utils.toWei("32", "ether")
-        // let endBalance = web3.utils.toWei("38", "ether")
-        // await this.ContractStafiNetworkWithdrawal.connect(this.AccountTrustNode1).withdrawStakingPool(stakingPoolAddress, startBalance, endBalance)
-        // let nodeBalanceAfter = await ethers.provider.getBalance(this.AccountNode1.address)
-
-        // expect(nodeBalanceAfter.sub(nodeBalanceBefore).toString()).to.equal(web3.utils.toWei("5.1475", "ether"))
-        // expect((await ethers.provider.getBalance(this.ContractStafiNetworkWithdrawal.address)).toString()).to.equal(web3.utils.toWei("0.6", 'ether'))
-        // expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("32.2525", 'ether'))
     })
-
 
     it("super node should stake success", async function () {
         console.log("latest block: ", await time.latestBlock())
@@ -333,9 +261,8 @@ describe("StafiDeposit", function () {
         let userDepositTxRecipient = await userDepositTx.wait()
         console.log("user deposit tx gas: ", userDepositTxRecipient.gasUsed.toString())
 
-        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("68", 'ether'))
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
-        expect((await this.ContractRETHToken.balanceOf(this.AccountUser1.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
+        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal("11278863318720567060895")
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal("11278863318720567060895");
         // node deposit
         let depositDataInStake = {
             pubkey: beacon.getValidatorPubkey(),
@@ -358,9 +285,9 @@ describe("StafiDeposit", function () {
         let nodeStakeTxRecipient = await nodeStakeTx.wait()
         console.log("super node stake tx gas: ", nodeStakeTxRecipient.gasUsed.toString())
 
-        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("4", 'ether'))
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("4", "ether"));
-        expect((await ethers.provider.getBalance(this.ContractDepositContract.address)).toString()).to.equal(web3.utils.toWei("64", 'ether'))
+        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal("11214863318720567060895")
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal("11214863318720567060895");
+        expect((await ethers.provider.getBalance(this.ContractDepositContract.address)).toString()).to.equal("13391351000069000000000069")
 
         expect((await this.ContractStafiSuperNode.getSuperNodePubkeyCount(this.AccountSuperNode1.address)).toString()).to.equal("2")
         expect((await this.ContractStafiSuperNode.getSuperNodePubkeyAt(this.AccountSuperNode1.address, 0))).to.equal("0x" + depositDataInStake.pubkey.toString("hex"))
@@ -386,7 +313,7 @@ describe("StafiDeposit", function () {
 
         // users: (35-35*1/10)*7/8*9/10 = 24.80625
         // node+platform:  10.19375
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("24.80625", "ether"));
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toBN("11214863318720567060895").add(web3.utils.toBN(web3.utils.toWei("24.80625", "ether"))).toString());
         expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("10.19375", "ether"));
         expect((await ethers.provider.getBalance(this.ContractStafiFeePool.address)).toString()).to.equal(web3.utils.toWei("3", "ether"));
 
@@ -397,7 +324,7 @@ describe("StafiDeposit", function () {
 
         // users: (3-3*1/10)*9/10 = 2.43
         // node+platform: 0.57
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("27.23625", "ether"));
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toBN("11214863318720567060895").add(web3.utils.toBN(web3.utils.toWei("27.23625", "ether"))).toString());
         expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("10.76375", "ether"));
         expect((await ethers.provider.getBalance(this.ContractStafiSuperNodeFeePool.address)).toString()).to.equal(web3.utils.toWei("0", "ether"));
 
@@ -411,7 +338,7 @@ describe("StafiDeposit", function () {
         console.log("root: ", tree.getHexRoot());
 
         // set merkle root
-        let setMerkleRootTx = await this.ContractStafiDistributor.connect(this.AccountAdmin).setMerkleRoot(0, tree.getHexRoot(), { from: this.AccountAdmin.address })
+        let setMerkleRootTx = await this.ContractStafiDistributor.connect(this.Admin).setMerkleRoot(0, tree.getHexRoot(), { from: this.Admin.address })
         let setMerkleRootTxRecepient = await setMerkleRootTx.wait()
         console.log("setMerkleRoot  tx gas: ", setMerkleRootTxRecepient.gasUsed.toString())
 
@@ -437,5 +364,4 @@ describe("StafiDeposit", function () {
         expect((await this.ContractStafiDistributor.isClaimed(0, 1))).to.equal(true);
         expect((await this.ContractStafiDistributor.isClaimed(0, 2))).to.equal(false);
     })
-
 })
