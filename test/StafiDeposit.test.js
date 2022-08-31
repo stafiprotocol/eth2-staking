@@ -297,35 +297,10 @@ describe("StafiDeposit", function () {
         expect((await this.ContractStafiStakingPoolManager.getNodeStakingPoolCount(this.AccountNode1.address)).toString()).to.equal("2")
         expect((await this.ContractStafiStakingPoolManager.getNodeStakingPoolAt(this.AccountNode1.address, 0))).to.equal(stakingPoolAddress)
         expect((await this.ContractStafiStakingPoolManager.getNodeStakingPoolAt(this.AccountNode1.address, 1))).to.equal(stakingPoolAddress2)
-
-
-
-        // expect((await ethers.provider.getBalance(this.ContractStafiNetworkWithdrawal.address)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
-        // start: total 32eth, node 4eth, users 28eth 
-        // end: total 38eth, platform 0.6eth, node 4 + 5.4*1/8 + 5.4*7/8*1/10 = 5.1475, users 28 + 5.4*7/8*9/10 = 32.2525
-        // send deposit and reward eth to StafiNetworkWithdrawal contract
-        // await this.AccountWithdrawer1.sendTransaction({
-        //     to: this.ContractStafiNetworkWithdrawal.address,
-        //     value: web3.utils.toWei("38", "ether")
-        // })
-
-        // expect((await ethers.provider.getBalance(this.ContractStafiNetworkWithdrawal.address)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
-        // expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("38", 'ether'))
-        // let nodeBalanceBefore = await ethers.provider.getBalance(this.AccountNode1.address)
-
-        // // distribute deposit and reward to node/users by trust node
-        // let startBalance = web3.utils.toWei("32", "ether")
-        // let endBalance = web3.utils.toWei("38", "ether")
-        // await this.ContractStafiNetworkWithdrawal.connect(this.AccountTrustNode1).withdrawStakingPool(stakingPoolAddress, startBalance, endBalance)
-        // let nodeBalanceAfter = await ethers.provider.getBalance(this.AccountNode1.address)
-
-        // expect(nodeBalanceAfter.sub(nodeBalanceBefore).toString()).to.equal(web3.utils.toWei("5.1475", "ether"))
-        // expect((await ethers.provider.getBalance(this.ContractStafiNetworkWithdrawal.address)).toString()).to.equal(web3.utils.toWei("0.6", 'ether'))
-        // expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("32.2525", 'ether'))
     })
 
 
-    it("super node should stake success", async function () {
+    it("super node should deposit/stake success", async function () {
         console.log("latest block: ", await time.latestBlock())
 
         // user deposit
@@ -336,25 +311,55 @@ describe("StafiDeposit", function () {
         expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("68", 'ether'))
         expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
         expect((await this.ContractRETHToken.balanceOf(this.AccountUser1.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
+
         // node deposit
-        let depositDataInStake = {
+        let depositDataInDeposit = {
             pubkey: beacon.getValidatorPubkey(),
             withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
-            amount: BigInt(32000000000), // gwei
+            amount: BigInt(1000000000), // gwei
+            signature: beacon.getValidatorSignature(),
+        };
+
+        let depositDataInDeposit2 = {
+            pubkey: beacon.getValidatorPubkey(),
+            withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
+            amount: BigInt(1000000000), // gwei
+            signature: beacon.getValidatorSignature(),
+        };
+        let depositDataInDepositRoot = beacon.getDepositDataRoot(depositDataInDeposit);
+        let depositDataInDepositRoot2 = beacon.getDepositDataRoot(depositDataInDeposit2);
+
+        let nodeDepositTx = await this.ContractStafiSuperNode.connect(this.AccountSuperNode1).deposit(
+            [depositDataInDeposit.pubkey, depositDataInDeposit2.pubkey], [depositDataInDeposit.signature, depositDataInDeposit2.signature], [depositDataInDepositRoot, depositDataInDepositRoot2])
+        let nodeDepositTxRecipient = await nodeDepositTx.wait()
+        console.log("super node deposit tx gas: ", nodeDepositTxRecipient.gasUsed.toString())
+
+        // trust node vote withdrawCredentials
+        await this.ContractStafiSuperNode.connect(this.AccountTrustNode1).voteWithdrawCredentials(depositDataInDeposit.pubkey, true)
+        await this.ContractStafiSuperNode.connect(this.AccountTrustNode1).voteWithdrawCredentials(depositDataInDeposit2.pubkey, true)
+
+        expect((await this.ContractStafiSuperNode.getSuperNodePubkeyStatus(depositDataInDeposit.pubkey)).toString()).to.equal("2")
+        expect((await this.ContractStafiSuperNode.getSuperNodePubkeyStatus(depositDataInDeposit2.pubkey)).toString()).to.equal("2")
+
+        // node stake
+        let depositDataInStake = {
+            pubkey: depositDataInDeposit.pubkey,
+            withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
+            amount: BigInt(31000000000), // gwei
             signature: beacon.getValidatorSignature(),
         };
 
         let depositDataInStake2 = {
-            pubkey: beacon.getValidatorPubkey(),
+            pubkey: depositDataInDeposit2.pubkey,
             withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
-            amount: BigInt(32000000000), // gwei
+            amount: BigInt(31000000000), // gwei
             signature: beacon.getValidatorSignature(),
         };
-        let depositDataRoot = beacon.getDepositDataRoot(depositDataInStake);
-        let depositDataRoot2 = beacon.getDepositDataRoot(depositDataInStake2);
+        let depositDataInStakeRoot = beacon.getDepositDataRoot(depositDataInStake);
+        let depositDataInStakeRoot2 = beacon.getDepositDataRoot(depositDataInStake2);
 
         let nodeStakeTx = await this.ContractStafiSuperNode.connect(this.AccountSuperNode1).stake(
-            [depositDataInStake.pubkey, depositDataInStake2.pubkey], [depositDataInStake.signature, depositDataInStake2.signature], [depositDataRoot, depositDataRoot2])
+            [depositDataInStake.pubkey, depositDataInStake2.pubkey], [depositDataInStake.signature, depositDataInStake2.signature], [depositDataInStakeRoot, depositDataInStakeRoot2])
         let nodeStakeTxRecipient = await nodeStakeTx.wait()
         console.log("super node stake tx gas: ", nodeStakeTxRecipient.gasUsed.toString())
 

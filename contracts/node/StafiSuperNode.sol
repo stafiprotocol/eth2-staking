@@ -18,6 +18,7 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
 
     event EtherDeposited(address indexed from, uint256 amount, uint256 time);
     event Staked(address indexed node, bytes pubkey);
+    event Deposited(address indexed node, bytes pubkey);
     event VoteWithdrawalCredentials(address node, bytes pubkey);
 
     uint256 public constant PUBKEY_STATUS_UNINITIAL = 0;
@@ -57,6 +58,11 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
         return getUint(keccak256(abi.encodePacked("superNode.pubkey.status", _validatorPubkey)));
     }
 
+    // Set a super node pubkey status
+    function setSuperNodePubkeyStatus(bytes calldata _validatorPubkey, uint256 _status) private {
+        return setUint(keccak256(abi.encodePacked("superNode.pubkey.status", _validatorPubkey)), _status);
+    }
+
     // Deposit ETH from deposit pool
     // Only accepts calls from the StafiUserDeposit contract
     function depositEth() override external payable onlyLatestContract("stafiUserDeposit", msg.sender) {
@@ -65,24 +71,24 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
     }
 
     function deposit(bytes[] calldata _validatorPubkeys, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external onlyLatestContract("stafiSuperNode", address(this)) onlySuperNode(msg.sender) {
-        require(_validatorPubkeys.length == _validatorSignatures.length && _validatorPubkeys.length == _depositDataRoots.length);
-        require(getSuperNodePubkeyCount(msg.sender).add(_validatorPubkeys.length) <= StafiNetworkSettings().getSuperNodePubkeyLimit(), "pubkey amount over limit");
+        uint256 len = _validatorPubkeys.length;
+        require(len == _validatorSignatures.length && len == _depositDataRoots.length);
+        require(getSuperNodePubkeyCount(msg.sender).add(len) <= StafiNetworkSettings().getSuperNodePubkeyLimit(), "pubkey amount over limit");
+        // Load contracts
+        IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
+        stafiUserDeposit.withdrawExcessBalanceForSuperNode(len.mul(32 ether));
 
-        for (uint256 i = 0; i < _validatorPubkeys.length; i++) {
+        for (uint256 i = 0; i < len; i++) {
             _deposit(_validatorPubkeys[i], _validatorSignatures[i], _depositDataRoots[i]);
         }
     }
 
     function _deposit(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) private {
         setAndCheckNodePubkeyInDeposit(_validatorPubkey);
-        // Load contracts
-        IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
-        stafiUserDeposit.withdrawExcessBalanceForSuperNode(1 ether);
-        
         // Send staking deposit to casper
         EthDeposit().deposit{value: 1 ether}(_validatorPubkey, StafiNetworkSettings().getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
 
-        emit Staked(msg.sender, _validatorPubkey);
+        emit Deposited(msg.sender, _validatorPubkey);
     }
 
     function stake(bytes[] calldata _validatorPubkeys, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external onlyLatestContract("stafiSuperNode", address(this)) onlySuperNode(msg.sender) {
@@ -96,10 +102,6 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
 
     function _stake(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) private {
         setAndCheckNodePubkeyInStake(_validatorPubkey);
-        // Load contracts
-        IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
-        stafiUserDeposit.withdrawExcessBalanceForSuperNode(31 ether);
-        
         // Send staking deposit to casper
         EthDeposit().deposit{value: 31 ether}(_validatorPubkey, StafiNetworkSettings().getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
 
@@ -118,9 +120,9 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
 
 
         // check status
-        require(getUint(keccak256(abi.encodePacked("superNode.pubkey.status", _pubkey))) == PUBKEY_STATUS_UNINITIAL, "pubkey status unmatch");
+        require(getSuperNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_UNINITIAL, "pubkey status unmatch");
         // set pubkey status
-        setUint(keccak256(abi.encodePacked("superNode.pubkey.status", _pubkey)), PUBKEY_STATUS_INITIAL);
+        setSuperNodePubkeyStatus(_pubkey, PUBKEY_STATUS_INITIAL);
         // add pubkey to set
         PubkeySetStorage().addItem(keccak256(abi.encodePacked("superNode.pubkeys.index", msg.sender)), _pubkey);
     }
@@ -128,9 +130,9 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
     // Set and check a node's validator pubkey
     function setAndCheckNodePubkeyInStake(bytes calldata _pubkey) private {
         // check status
-        require(getUint(keccak256(abi.encodePacked("superNode.pubkey.status", _pubkey))) == PUBKEY_STATUS_MATCH, "pubkey status unmatch");
+        require(getSuperNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_MATCH, "pubkey status unmatch");
         // set pubkey status
-        setUint(keccak256(abi.encodePacked("superNode.pubkey.status", _pubkey)), PUBKEY_STATUS_STAKING);
+        setSuperNodePubkeyStatus(_pubkey, PUBKEY_STATUS_STAKING);
     }
 
     // Only accepts calls from trusted (oracle) nodes
@@ -147,11 +149,11 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
         // Emit event
         emit VoteWithdrawalCredentials(msg.sender, _pubkey);
        
-        // Check submission count & update network balances
+        // Check count and set status
         uint256 calcBase = 1 ether;
         IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
         if (getSuperNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_INITIAL &&  calcBase.mul(totalVotes) >= stafiNodeManager.getTrustedNodeCount().mul(StafiNetworkSettings().getNodeConsensusThreshold())) {
-            setUint(keccak256(abi.encodePacked("superNode.pubkey.status", _pubkey)), _match ? PUBKEY_STATUS_MATCH : PUBKEY_STATUS_UNMATCH);
+            setSuperNodePubkeyStatus(_pubkey, _match ? PUBKEY_STATUS_MATCH : PUBKEY_STATUS_UNMATCH);
         }
     }
 }
