@@ -76,7 +76,7 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
         require(getSuperNodePubkeyCount(msg.sender).add(len) <= StafiNetworkSettings().getSuperNodePubkeyLimit(), "pubkey amount over limit");
         // Load contracts
         IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
-        stafiUserDeposit.withdrawExcessBalanceForSuperNode(len.mul(32 ether));
+        stafiUserDeposit.withdrawExcessBalanceForSuperNode(len.mul(1 ether));
 
         for (uint256 i = 0; i < len; i++) {
             _deposit(_validatorPubkeys[i], _validatorSignatures[i], _depositDataRoots[i]);
@@ -92,10 +92,13 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
     }
 
     function stake(bytes[] calldata _validatorPubkeys, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external onlyLatestContract("stafiSuperNode", address(this)) onlySuperNode(msg.sender) {
-        require(_validatorPubkeys.length == _validatorSignatures.length && _validatorPubkeys.length == _depositDataRoots.length);
-        require(getSuperNodePubkeyCount(msg.sender).add(_validatorPubkeys.length) <= StafiNetworkSettings().getSuperNodePubkeyLimit(), "pubkeys over limit");
-
-        for (uint256 i = 0; i < _validatorPubkeys.length; i++) {
+        uint256 len = _validatorPubkeys.length;
+        require(len == _validatorSignatures.length && len == _depositDataRoots.length);
+        // Load contracts
+        IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
+        stafiUserDeposit.withdrawExcessBalanceForSuperNode(len.mul(31 ether));
+        
+        for (uint256 i = 0; i < len; i++) {
             _stake(_validatorPubkeys[i], _validatorSignatures[i], _depositDataRoots[i]);
         }
     }
@@ -111,12 +114,14 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
     
     // Set and check a node's validator pubkey
     function setAndCheckNodePubkeyInDeposit(bytes calldata _pubkey) private {
-        // check pubkey of superNodes/lightNodes
-        require(!getBool(keccak256(abi.encodePacked("superNode.pubkey.exists", _pubkey))), "super or light Node pubkey exists");
-        // set validator pubkey exists in superNodes/lightNodes
+        // check pubkey of superNodes
+        require(!getBool(keccak256(abi.encodePacked("superNode.pubkey.exists", _pubkey))), "super Node pubkey exists");
+        // set validator pubkey exists in superNodes
         setBool(keccak256(abi.encodePacked("superNode.pubkey.exists", _pubkey)), true);
         // check pubkey of stakingpools
         require(getAddress(keccak256(abi.encodePacked("validator.stakingpool", _pubkey))) == address(0x0), "stakingpool pubkey exists");
+        // check pubkey of lightNodes
+        require(!getBool(keccak256(abi.encodePacked("lightNode.pubkey.exists", _pubkey))), "light Node pubkey exists");
 
 
         // check status

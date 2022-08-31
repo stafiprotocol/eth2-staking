@@ -12,4 +12,5 @@ interface IStafiUserDeposit {
     function assignDeposits() external;
     function withdrawExcessBalance(uint256 _amount) external;
     function withdrawExcessBalanceForSuperNode(uint256 _amount) external;
+    function withdrawExcessBalanceForLightNode(uint256 _amount) external;
 }

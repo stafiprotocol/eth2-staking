@@ -11,6 +11,7 @@ import "../interfaces/pool/IStafiStakingPool.sol";
 import "../interfaces/pool/IStafiStakingPoolQueue.sol";
 import "../interfaces/token/IRETHToken.sol";
 import "../interfaces/node/IStafiSuperNode.sol";
+import "../interfaces/node/IStafiLightNode.sol";
 
 // Accepts user deposits and mints rETH; handles assignment of deposited ETH to pools
 contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer {
@@ -162,6 +163,21 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         stafiEther.withdrawEther(_amount);
         // Transfer to superNode contract
         superNode.depositEth{value: _amount}();
+        // Emit excess withdrawn event
+        emit ExcessWithdrawn(msg.sender, _amount, block.timestamp);
+    }
+    
+    // Withdraw excess deposit pool balance for light node
+    function withdrawExcessBalanceForLightNode(uint256 _amount) override external onlyLatestContract("stafiUserDeposit", address(this)) onlyLatestContract("stafiLightNode", msg.sender) {
+        // Load contracts
+        IStafiLightNode lightNode = IStafiLightNode(getContractAddress("stafiLightNode"));
+        IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
+        // Check amount
+        require(_amount <= getExcessBalance(), "Insufficient balance for withdrawal");
+        // Withdraw ETH from vault
+        stafiEther.withdrawEther(_amount);
+        // Transfer to superNode contract
+        lightNode.depositEth{value: _amount}();
         // Emit excess withdrawn event
         emit ExcessWithdrawn(msg.sender, _amount, block.timestamp);
     }

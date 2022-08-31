@@ -34,6 +34,13 @@ describe("upgrade test", function () {
             to: this.TrustNode1.address,
             value: web3.utils.toWei("30", "ether")
         })
+        this.TrustNode2 = await ethers.getImpersonatedSigner("0x80AA112eED03dCC44bEE7F2A1dA7e5A0d04591BD");
+        console.log("trust node1 : ", this.TrustNode2.address);
+        await this.AccountUser1.sendTransaction({
+            to: this.TrustNode2.address,
+            value: web3.utils.toWei("30", "ether")
+        })
+
 
         this.StafiStorageAddress = "0x6c2f7b6110a37b3b0fbdd811876be368df02e8b0"
         this.StafiUpgradeAddress = "0xb0da556df7c66ed429191e113974a6c474f2b389"
@@ -297,9 +304,9 @@ describe("upgrade test", function () {
 
         // trust node vote withdrawCredentials
         await this.ContractStafiSuperNode.connect(this.TrustNode1).voteWithdrawCredentials(depositDataInDeposit.pubkey, true)
-        // await this.ContractStafiSuperNode.connect(this.TrustNode1).voteWithdrawCredentials(depositDataInDeposit.pubkey, true)
+        await this.ContractStafiSuperNode.connect(this.TrustNode2).voteWithdrawCredentials(depositDataInDeposit.pubkey, true)
         await this.ContractStafiSuperNode.connect(this.TrustNode1).voteWithdrawCredentials(depositDataInDeposit2.pubkey, true)
-        // await this.ContractStafiSuperNode.connect(this.TrustNode1).voteWithdrawCredentials(depositDataInDeposit2.pubkey, true)
+        await this.ContractStafiSuperNode.connect(this.TrustNode2).voteWithdrawCredentials(depositDataInDeposit2.pubkey, true)
 
         // node deposit
         let depositDataInStake = {
