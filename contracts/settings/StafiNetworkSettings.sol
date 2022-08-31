@@ -22,6 +22,7 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
             setPlatformFee(0.1 ether); // 10%
             setNodeRefundRatio(0.25 ether); // 25%
             setNodeTrustedRefundRatio(0.5 ether); // 50%
+            setSuperNodePubkeyLimit(50);
             // Settings initialized
             setBoolS("settings.network.init", true);
         }
@@ -95,6 +96,15 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
     // Set the validator withdrawal credentials
     function setWithdrawalCredentials(bytes memory _value) public onlySuperUser {
         setBytesS("settings.network.withdrawal.credentials", _value);
+    }
+
+    // Get super node pubkey limit
+    function getSuperNodePubkeyLimit() override public view returns (uint256) {
+        return getUintS("settings.network.superNode.pubkeyLimit");
+    }
+    // Set super node pubkey limit
+    function setSuperNodePubkeyLimit(uint256 _value) public onlySuperUser {
+        setUintS("settings.network.superNode.pubkeyLimit", _value);
     }
 
 }

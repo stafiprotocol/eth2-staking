@@ -139,7 +139,8 @@ contract StafiStakingPoolDelegate is StafiStakingPoolStorage, IStafiStakingPool 
 
         // Check validator pubkey is not in use
         require(stafiStakingPoolManager.getStakingPoolByPubkey(_validatorPubkey) == address(0x0), "pubkey is used");
-        require(!stafiStorage.getBool(keccak256(abi.encodePacked("superNode.pubkey.exists", _validatorPubkey))), "superNode pubkey exists");
+        // check pubkey in superNodes/lightNodes
+        require(!stafiStorage.getBool(keccak256(abi.encodePacked("superNode.pubkey.exists", _validatorPubkey))), "super or light node pubkey exists");
         // Set stakingPool pubkey
         stafiStakingPoolManager.setStakingPoolPubkey(_validatorPubkey);
         // prestake if necessary

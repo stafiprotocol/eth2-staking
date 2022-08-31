@@ -11,4 +11,5 @@ interface IStafiNetworkSettings {
     function getNodeRefundRatio() external view returns (uint256);
     function getNodeTrustedRefundRatio() external view returns (uint256);
     function getWithdrawalCredentials() external view returns (bytes memory);
+    function getSuperNodePubkeyLimit() external view returns (uint256);
 }

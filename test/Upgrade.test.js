@@ -200,8 +200,10 @@ describe("upgrade test", function () {
         expect((await ethers.provider.getBalance(this.ContractDepositContract.address)).toString()).to.equal("13391231000069000000000069")
 
         // trust node vote withdrawCredentials
-        await contractStakingPool.connect(this.TrustNode1).voteWithdrawCredentials()
+        let voteWithdrawCredentials = await contractStakingPool.connect(this.TrustNode1).voteWithdrawCredentials()
         await contractStakingPool2.connect(this.TrustNode1).voteWithdrawCredentials()
+        let voteWithdrawCredentialsRecipient = await voteWithdrawCredentials.wait()
+        console.log("voteWithdrawCredentialsRecipient tx gas: ", voteWithdrawCredentialsRecipient.gasUsed.toString())
 
         expect(await contractStakingPool.getWithdrawalCredentialsMatch()).to.equal(true)
         expect(await contractStakingPool.getWithdrawalCredentialsMatch()).to.equal(true)
