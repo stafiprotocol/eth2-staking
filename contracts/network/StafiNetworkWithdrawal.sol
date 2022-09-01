@@ -16,6 +16,7 @@ import "../interfaces/IStafiEtherWithdrawer.sol";
 import "../types/StakingPoolStatus.sol";
 
 // Handles network validator withdrawals
+// deprecated contract
 contract StafiNetworkWithdrawal is StafiBase, IStafiNetworkWithdrawal, IStafiEtherWithdrawer {
 
     // Libs

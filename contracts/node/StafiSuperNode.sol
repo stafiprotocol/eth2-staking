@@ -31,6 +31,14 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
         version = 1;
     }
 
+
+    // Deposit ETH from deposit pool
+    // Only accepts calls from the StafiUserDeposit contract
+    function depositEth() override external payable onlyLatestContract("stafiUserDeposit", msg.sender) {
+        // Emit ether deposited event
+        emit EtherDeposited(msg.sender, msg.value, block.timestamp);
+    }
+
     function EthDeposit() private view returns (IDepositContract) {
         return IDepositContract(getContractAddress("ethDeposit"));
     }
@@ -63,14 +71,16 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
         return setUint(keccak256(abi.encodePacked("superNode.pubkey.status", _validatorPubkey)), _status);
     }
 
-    // Deposit ETH from deposit pool
-    // Only accepts calls from the StafiUserDeposit contract
-    function depositEth() override external payable onlyLatestContract("stafiUserDeposit", msg.sender) {
-        // Emit ether deposited event
-        emit EtherDeposited(msg.sender, msg.value, block.timestamp);
+    function getSuperNodeDepositEnabled() public view returns (bool) {
+        return getBoolS("settings.superNode.deposit.enabled");
+    }
+
+    function setSuperNodeDepositEnabled(bool _value) public onlySuperUser {
+        setBoolS("settings.superNode.deposit.enabled", _value);
     }
 
     function deposit(bytes[] calldata _validatorPubkeys, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external onlyLatestContract("stafiSuperNode", address(this)) onlySuperNode(msg.sender) {
+        require(getSuperNodeDepositEnabled(), "super node deposits are currently disabled");
         uint256 len = _validatorPubkeys.length;
         require(len == _validatorSignatures.length && len == _depositDataRoots.length);
         require(getSuperNodePubkeyCount(msg.sender).add(len) <= StafiNetworkSettings().getSuperNodePubkeyLimit(), "pubkey amount over limit");
@@ -81,14 +91,6 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
         for (uint256 i = 0; i < len; i++) {
             _deposit(_validatorPubkeys[i], _validatorSignatures[i], _depositDataRoots[i]);
         }
-    }
-
-    function _deposit(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) private {
-        setAndCheckNodePubkeyInDeposit(_validatorPubkey);
-        // Send staking deposit to casper
-        EthDeposit().deposit{value: 1 ether}(_validatorPubkey, StafiNetworkSettings().getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
-
-        emit Deposited(msg.sender, _validatorPubkey);
     }
 
     function stake(bytes[] calldata _validatorPubkeys, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external onlyLatestContract("stafiSuperNode", address(this)) onlySuperNode(msg.sender) {
@@ -102,6 +104,15 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
             _stake(_validatorPubkeys[i], _validatorSignatures[i], _depositDataRoots[i]);
         }
     }
+
+    function _deposit(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) private {
+        setAndCheckNodePubkeyInDeposit(_validatorPubkey);
+        // Send staking deposit to casper
+        EthDeposit().deposit{value: 1 ether}(_validatorPubkey, StafiNetworkSettings().getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
+
+        emit Deposited(msg.sender, _validatorPubkey);
+    }
+
 
     function _stake(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) private {
         setAndCheckNodePubkeyInStake(_validatorPubkey);

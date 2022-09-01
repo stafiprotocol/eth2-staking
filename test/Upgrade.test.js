@@ -271,6 +271,8 @@ describe("upgrade test", function () {
 
     it("super node should deposit/stake success", async function () {
         console.log("latest block: ", await time.latestBlock())
+        // enable deposit
+        await this.ContractStafiSuperNode.connect(this.Admin).setSuperNodeDepositEnabled(true)
 
         // user deposit
         let userDepositTx = await this.ContractStafiUserDeposit.connect(this.AccountUser1).deposit({ from: this.AccountUser1.address, value: web3.utils.toWei('68', 'ether') })

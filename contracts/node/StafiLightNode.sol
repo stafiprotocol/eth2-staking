@@ -11,14 +11,17 @@ import "../interfaces/eth/IDepositContract.sol";
 import "../interfaces/settings/IStafiNetworkSettings.sol";
 import "../interfaces/storage/IPubkeySetStorage.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "../interfaces/IStafiEtherWithdrawer.sol";
+import "../interfaces/IStafiEther.sol";
 
-contract StafiLightNode is StafiBase, IStafiLightNode {
+contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
     // Libs
     using SafeMath for uint256;
 
     event EtherDeposited(address indexed from, uint256 amount, uint256 time);
     event Staked(address indexed node, bytes pubkey);
     event Deposited(address indexed node, bytes pubkey);
+    event OffBoarded(address indexed node, bytes pubkey);
     event VoteWithdrawalCredentials(address node, bytes pubkey);
 
     uint256 public constant PUBKEY_STATUS_UNINITIAL = 0;
@@ -26,11 +29,24 @@ contract StafiLightNode is StafiBase, IStafiLightNode {
     uint256 public constant PUBKEY_STATUS_MATCH = 2;
     uint256 public constant PUBKEY_STATUS_STAKING = 3;
     uint256 public constant PUBKEY_STATUS_UNMATCH = 4;
-    uint256 public constant PUBKEY_STATUS_REFOUND = 5;
+    uint256 public constant PUBKEY_STATUS_OFFBOARD = 5;
+    uint256 public constant PUBKEY_STATUS_CANWITHDRAW = 6; // can withdraw node deposit amount after offboard
+    uint256 public constant PUBKEY_STATUS_WITHDRAWED = 7;
 
     // Construct
     constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
         version = 1;
+    }
+
+    // Receive a ether withdrawal
+    // Only accepts calls from the StafiEther contract
+    function receiveEtherWithdrawal() override external payable onlyLatestContract("stafiLightNode", address(this)) onlyLatestContract("stafiEther", msg.sender) {}
+
+    // Deposit ETH from deposit pool
+    // Only accepts calls from the StafiUserDeposit contract
+    function depositEth() override external payable onlyLatestContract("stafiUserDeposit", msg.sender) {
+        // Emit ether deposited event
+        emit EtherDeposited(msg.sender, msg.value, block.timestamp);
     }
 
     function EthDeposit() private view returns (IDepositContract) {
@@ -65,31 +81,23 @@ contract StafiLightNode is StafiBase, IStafiLightNode {
         return setUint(keccak256(abi.encodePacked("lightNode.pubkey.status", _validatorPubkey)), _status);
     }
 
-    // Deposit ETH from deposit pool
-    // Only accepts calls from the StafiUserDeposit contract
-    function depositEth() override external payable onlyLatestContract("stafiUserDeposit", msg.sender) {
-        // Emit ether deposited event
-        emit EtherDeposited(msg.sender, msg.value, block.timestamp);
+    function getLightNodeDepositEnabled() public view returns (bool) {
+        return getBoolS("settings.lightNode.deposit.enabled");
     }
 
-    function deposit(bytes[] calldata _validatorPubkeys, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external onlyLatestContract("stafiLightNode", address(this)) {
+    function setLightNodeDepositEnabled(bool _value) public onlySuperUser {
+        setBoolS("settings.lightNode.deposit.enabled", _value);
+    }
+
+    function deposit(bytes[] calldata _validatorPubkeys, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external payable onlyLatestContract("stafiLightNode", address(this)) {
+        require(getLightNodeDepositEnabled(), "light node deposits are currently disabled");
         uint256 len = _validatorPubkeys.length;
-        require(len == _validatorSignatures.length && len == _depositDataRoots.length);
-        // Load contracts
-        IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
-        stafiUserDeposit.withdrawExcessBalanceForLightNode(len.mul(4 ether));
+        require(len == _validatorSignatures.length && len == _depositDataRoots.length, "params len err");
+        require(msg.value == len.mul(4 ether), "msg value not match");
 
         for (uint256 i = 0; i < len; i++) {
             _deposit(_validatorPubkeys[i], _validatorSignatures[i], _depositDataRoots[i]);
         }
-    }
-
-    function _deposit(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) private {
-        setAndCheckNodePubkeyInDeposit(_validatorPubkey);
-        // Send staking deposit to casper
-        EthDeposit().deposit{value: 4 ether}(_validatorPubkey, StafiNetworkSettings().getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
-
-        emit Deposited(msg.sender, _validatorPubkey);
     }
 
     function stake(bytes[] calldata _validatorPubkeys, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external onlyLatestContract("stafiLightNode", address(this)) {
@@ -101,6 +109,48 @@ contract StafiLightNode is StafiBase, IStafiLightNode {
         for (uint256 i = 0; i < _validatorPubkeys.length; i++) {
             _stake(_validatorPubkeys[i], _validatorSignatures[i], _depositDataRoots[i]);
         }
+    }
+
+    function offBoard(bytes calldata _validatorPubkey) override external onlyLatestContract("stafiLightNode", address(this)) {
+        setAndCheckNodePubkeyInOffBoard(_validatorPubkey);
+
+        emit OffBoarded(msg.sender, _validatorPubkey);
+    }
+
+    function provideNodeDepositToken(bytes calldata _validatorPubkey) override external payable onlyLatestContract("stafiLightNode", address(this)) {
+        require(msg.value == 4 ether, "msg value not match");
+        // check status
+        require(getLightNodePubkeyStatus(_validatorPubkey) == PUBKEY_STATUS_OFFBOARD, "pubkey status unmatch");
+        
+        IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
+        stafiEther.depositEther{value: msg.value}();
+
+        // set pubkey status
+        setLightNodePubkeyStatus(_validatorPubkey, PUBKEY_STATUS_CANWITHDRAW);
+    }
+    
+    function withdrawNodeDepositToken(bytes calldata _validatorPubkey) override external onlyLatestContract("stafiLightNode", address(this)) {
+        // check status
+        require(getLightNodePubkeyStatus(_validatorPubkey) == PUBKEY_STATUS_CANWITHDRAW, "pubkey status unmatch");
+        // check owner
+        require(PubkeySetStorage().getIndexOf(keccak256(abi.encodePacked("lightNode.pubkeys.index", msg.sender)), _validatorPubkey) >= 0, "not pubkey owner");
+
+        IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
+        stafiEther.withdrawEther(4 ether);
+
+        (bool success,) = (msg.sender).call{value: 4 ether}("");
+        require(success, "transferr failed");
+
+        // set pubkey status
+        setLightNodePubkeyStatus(_validatorPubkey, PUBKEY_STATUS_WITHDRAWED);
+    }
+
+    function _deposit(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) private {
+        setAndCheckNodePubkeyInDeposit(_validatorPubkey);
+        // Send staking deposit to casper
+        EthDeposit().deposit{value: 4 ether}(_validatorPubkey, StafiNetworkSettings().getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
+
+        emit Deposited(msg.sender, _validatorPubkey);
     }
 
     function _stake(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) private {
@@ -138,7 +188,18 @@ contract StafiLightNode is StafiBase, IStafiLightNode {
         // set pubkey status
         setLightNodePubkeyStatus(_pubkey, PUBKEY_STATUS_STAKING);
     }
-
+    
+    // Set and check a node's validator pubkey
+    function setAndCheckNodePubkeyInOffBoard(bytes calldata _pubkey) private {
+        // check status
+        require(getLightNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_MATCH, "pubkey status unmatch");
+        // check owner
+        require(PubkeySetStorage().getIndexOf(keccak256(abi.encodePacked("lightNode.pubkeys.index", msg.sender)), _pubkey) >= 0, "not pubkey owner");
+        
+        // set pubkey status
+        setLightNodePubkeyStatus(_pubkey, PUBKEY_STATUS_OFFBOARD);
+    }
+    
     // Only accepts calls from trusted (oracle) nodes
     function voteWithdrawCredentials(bytes calldata _pubkey, bool _match) override external onlyLatestContract("stafiLightNode", address(this)) onlyTrustedNode(msg.sender) {
         // Check & update node vote status

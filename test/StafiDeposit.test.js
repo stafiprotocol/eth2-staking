@@ -33,6 +33,7 @@ describe("StafiDeposit", function () {
 
         this.FactoryStafiNodeManager = await ethers.getContractFactory("StafiNodeManager", this.AccountAdmin)
         this.FactoryStafiSuperNode = await ethers.getContractFactory("StafiSuperNode", this.AccountAdmin)
+        this.FactoryStafiLightNode = await ethers.getContractFactory("StafiLightNode", this.AccountAdmin)
 
         this.FactoryStafiStakingPoolQueue = await ethers.getContractFactory("StafiStakingPoolQueue", this.AccountAdmin)
         this.FactoryStafiStakingPoolManager = await ethers.getContractFactory("StafiStakingPoolManager", this.AccountAdmin)
@@ -140,6 +141,10 @@ describe("StafiDeposit", function () {
         console.log("contract stafiSuperNode address: ", this.ContractStafiSuperNode.address)
         await this.ContractStafiUpgrade.addContract("stafiSuperNode", this.ContractStafiSuperNode.address)
 
+        this.ContractStafiLightNode = await this.FactoryStafiLightNode.deploy(this.ContractStafiStorage.address)
+        await this.ContractStafiLightNode.deployed()
+        console.log("contract stafiLightNode address: ", this.ContractStafiLightNode.address)
+        await this.ContractStafiUpgrade.addContract("stafiLightNode", this.ContractStafiLightNode.address)
 
 
         this.ContractStafiNetworkBalances = await this.FactoryStafiNetworkBalances.deploy(this.ContractStafiStorage.address)
@@ -302,6 +307,8 @@ describe("StafiDeposit", function () {
 
     it("super node should deposit/stake success", async function () {
         console.log("latest block: ", await time.latestBlock())
+        // enable deposit
+        await this.ContractStafiSuperNode.connect(this.AccountAdmin).setSuperNodeDepositEnabled(true)
 
         // user deposit
         let userDepositTx = await this.ContractStafiUserDeposit.connect(this.AccountUser1).deposit({ from: this.AccountUser1.address, value: web3.utils.toWei('68', 'ether') })
@@ -370,6 +377,82 @@ describe("StafiDeposit", function () {
         expect((await this.ContractStafiSuperNode.getSuperNodePubkeyCount(this.AccountSuperNode1.address)).toString()).to.equal("2")
         expect((await this.ContractStafiSuperNode.getSuperNodePubkeyAt(this.AccountSuperNode1.address, 0))).to.equal("0x" + depositDataInStake.pubkey.toString("hex"))
         expect((await this.ContractStafiSuperNode.getSuperNodePubkeyAt(this.AccountSuperNode1.address, 1))).to.equal("0x" + depositDataInStake2.pubkey.toString("hex"))
+
+    })
+
+    it("light node should deposit/stake success", async function () {
+        console.log("latest block: ", await time.latestBlock())
+        // enable deposit
+        await this.ContractStafiLightNode.connect(this.AccountAdmin).setLightNodeDepositEnabled(true)
+
+        // user deposit
+        let userDepositTx = await this.ContractStafiUserDeposit.connect(this.AccountUser1).deposit({ from: this.AccountUser1.address, value: web3.utils.toWei('68', 'ether') })
+        let userDepositTxRecipient = await userDepositTx.wait()
+        console.log("user deposit tx gas: ", userDepositTxRecipient.gasUsed.toString())
+
+        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("68", 'ether'))
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
+        expect((await this.ContractRETHToken.balanceOf(this.AccountUser1.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
+
+        // node deposit
+        let depositDataInDeposit = {
+            pubkey: beacon.getValidatorPubkey(),
+            withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
+            amount: BigInt(4000000000), // gwei
+            signature: beacon.getValidatorSignature(),
+        };
+
+        let depositDataInDeposit2 = {
+            pubkey: beacon.getValidatorPubkey(),
+            withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
+            amount: BigInt(4000000000), // gwei
+            signature: beacon.getValidatorSignature(),
+        };
+        let depositDataInDepositRoot = beacon.getDepositDataRoot(depositDataInDeposit);
+        let depositDataInDepositRoot2 = beacon.getDepositDataRoot(depositDataInDeposit2);
+
+        let nodeDepositTx = await this.ContractStafiLightNode.connect(this.AccountUser2).deposit(
+            [depositDataInDeposit.pubkey, depositDataInDeposit2.pubkey], [depositDataInDeposit.signature, depositDataInDeposit2.signature], [depositDataInDepositRoot, depositDataInDepositRoot2],
+            { from: this.AccountUser2.address, value: web3.utils.toWei('8', 'ether') })
+        let nodeDepositTxRecipient = await nodeDepositTx.wait()
+        console.log("light node deposit tx gas: ", nodeDepositTxRecipient.gasUsed.toString())
+
+        // trust node vote withdrawCredentials
+        await this.ContractStafiLightNode.connect(this.AccountTrustNode1).voteWithdrawCredentials(depositDataInDeposit.pubkey, true)
+        await this.ContractStafiLightNode.connect(this.AccountTrustNode1).voteWithdrawCredentials(depositDataInDeposit2.pubkey, true)
+
+        expect((await this.ContractStafiLightNode.getLightNodePubkeyStatus(depositDataInDeposit.pubkey)).toString()).to.equal("2")
+        expect((await this.ContractStafiLightNode.getLightNodePubkeyStatus(depositDataInDeposit2.pubkey)).toString()).to.equal("2")
+
+        // node stake
+        let depositDataInStake = {
+            pubkey: depositDataInDeposit.pubkey,
+            withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
+            amount: BigInt(28000000000), // gwei
+            signature: beacon.getValidatorSignature(),
+        };
+
+        let depositDataInStake2 = {
+            pubkey: depositDataInDeposit2.pubkey,
+            withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
+            amount: BigInt(28000000000), // gwei
+            signature: beacon.getValidatorSignature(),
+        };
+        let depositDataInStakeRoot = beacon.getDepositDataRoot(depositDataInStake);
+        let depositDataInStakeRoot2 = beacon.getDepositDataRoot(depositDataInStake2);
+
+        let nodeStakeTx = await this.ContractStafiLightNode.connect(this.AccountUser2).stake(
+            [depositDataInStake.pubkey, depositDataInStake2.pubkey], [depositDataInStake.signature, depositDataInStake2.signature], [depositDataInStakeRoot, depositDataInStakeRoot2])
+        let nodeStakeTxRecipient = await nodeStakeTx.wait()
+        console.log("light node stake tx gas: ", nodeStakeTxRecipient.gasUsed.toString())
+
+        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("12", 'ether'))
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("12", "ether"));
+        expect((await ethers.provider.getBalance(this.ContractDepositContract.address)).toString()).to.equal(web3.utils.toWei("64", 'ether'))
+
+        expect((await this.ContractStafiLightNode.getLightNodePubkeyCount(this.AccountUser2.address)).toString()).to.equal("2")
+        expect((await this.ContractStafiLightNode.getLightNodePubkeyAt(this.AccountUser2.address, 0))).to.equal("0x" + depositDataInStake.pubkey.toString("hex"))
+        expect((await this.ContractStafiLightNode.getLightNodePubkeyAt(this.AccountUser2.address, 1))).to.equal("0x" + depositDataInStake2.pubkey.toString("hex"))
 
     })
 
