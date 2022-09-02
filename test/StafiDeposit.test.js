@@ -191,7 +191,6 @@ describe("StafiDeposit", function () {
         this.WithdrawalCredentials = '0x00d0d8e23e26afa86382b1f1e7b7af7b5d431bfa68d3b3f3c2fe2a6e54353fa8'
         await this.ContractStafiNetworkSettings.setWithdrawalCredentials(this.WithdrawalCredentials)
 
-
         await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeTrusted(this.AccountTrustNode1.address, true)
         await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeSuper(this.AccountSuperNode1.address, true)
 
@@ -309,7 +308,6 @@ describe("StafiDeposit", function () {
         console.log("latest block: ", await time.latestBlock())
         // enable deposit
         await this.ContractStafiSuperNode.connect(this.AccountAdmin).setSuperNodeDepositEnabled(true)
-
         // user deposit
         let userDepositTx = await this.ContractStafiUserDeposit.connect(this.AccountUser1).deposit({ from: this.AccountUser1.address, value: web3.utils.toWei('68', 'ether') })
         let userDepositTxRecipient = await userDepositTx.wait()
@@ -384,7 +382,6 @@ describe("StafiDeposit", function () {
         console.log("latest block: ", await time.latestBlock())
         // enable deposit
         await this.ContractStafiLightNode.connect(this.AccountAdmin).setLightNodeDepositEnabled(true)
-
         // user deposit
         let userDepositTx = await this.ContractStafiUserDeposit.connect(this.AccountUser1).deposit({ from: this.AccountUser1.address, value: web3.utils.toWei('68', 'ether') })
         let userDepositTxRecipient = await userDepositTx.wait()

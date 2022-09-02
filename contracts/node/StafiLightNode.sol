@@ -77,8 +77,17 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
     }
 
     // Set a light node pubkey status
-    function setLightNodePubkeyStatus(bytes calldata _validatorPubkey, uint256 _status) private {
+    function _setLightNodePubkeyStatus(bytes calldata _validatorPubkey, uint256 _status) private {
         return setUint(keccak256(abi.encodePacked("lightNode.pubkey.status", _validatorPubkey)), _status);
+    }
+
+    function setLightNodePubkeyStatus(bytes calldata _validatorPubkey, uint256 _status) public onlySuperUser {
+        _setLightNodePubkeyStatus(_validatorPubkey, _status);
+    }
+
+    // Node deposits currently amount
+    function getCurrentNodeDepositAmount() public view returns (uint256) {
+        return getUint("settings.node.deposit.amount");
     }
 
     function getLightNodeDepositEnabled() public view returns (bool) {
@@ -93,7 +102,7 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
         require(getLightNodeDepositEnabled(), "light node deposits are currently disabled");
         uint256 len = _validatorPubkeys.length;
         require(len == _validatorSignatures.length && len == _depositDataRoots.length, "params len err");
-        require(msg.value == len.mul(4 ether), "msg value not match");
+        require(msg.value == len.mul(getCurrentNodeDepositAmount()), "msg value not match");
 
         for (uint256 i = 0; i < len; i++) {
             _deposit(_validatorPubkeys[i], _validatorSignatures[i], _depositDataRoots[i]);
@@ -104,7 +113,7 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
         require(_validatorPubkeys.length == _validatorSignatures.length && _validatorPubkeys.length == _depositDataRoots.length);
         // Load contracts
         IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
-        stafiUserDeposit.withdrawExcessBalanceForLightNode(_validatorPubkeys.length.mul(28 ether));
+        stafiUserDeposit.withdrawExcessBalanceForLightNode(_validatorPubkeys.length.mul(uint256(32 ether).sub(getCurrentNodeDepositAmount())));
 
         for (uint256 i = 0; i < _validatorPubkeys.length; i++) {
             _stake(_validatorPubkeys[i], _validatorSignatures[i], _depositDataRoots[i]);
@@ -118,7 +127,7 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
     }
 
     function provideNodeDepositToken(bytes calldata _validatorPubkey) override external payable onlyLatestContract("stafiLightNode", address(this)) {
-        require(msg.value == 4 ether, "msg value not match");
+        require(msg.value == getCurrentNodeDepositAmount(), "msg value not match");
         // check status
         require(getLightNodePubkeyStatus(_validatorPubkey) == PUBKEY_STATUS_OFFBOARD, "pubkey status unmatch");
         
@@ -126,7 +135,7 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
         stafiEther.depositEther{value: msg.value}();
 
         // set pubkey status
-        setLightNodePubkeyStatus(_validatorPubkey, PUBKEY_STATUS_CANWITHDRAW);
+        _setLightNodePubkeyStatus(_validatorPubkey, PUBKEY_STATUS_CANWITHDRAW);
     }
     
     function withdrawNodeDepositToken(bytes calldata _validatorPubkey) override external onlyLatestContract("stafiLightNode", address(this)) {
@@ -136,19 +145,19 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
         require(PubkeySetStorage().getIndexOf(keccak256(abi.encodePacked("lightNode.pubkeys.index", msg.sender)), _validatorPubkey) >= 0, "not pubkey owner");
 
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
-        stafiEther.withdrawEther(4 ether);
+        stafiEther.withdrawEther(getCurrentNodeDepositAmount());
 
-        (bool success,) = (msg.sender).call{value: 4 ether}("");
+        (bool success,) = (msg.sender).call{value: getCurrentNodeDepositAmount()}("");
         require(success, "transferr failed");
 
         // set pubkey status
-        setLightNodePubkeyStatus(_validatorPubkey, PUBKEY_STATUS_WITHDRAWED);
+        _setLightNodePubkeyStatus(_validatorPubkey, PUBKEY_STATUS_WITHDRAWED);
     }
 
     function _deposit(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) private {
         setAndCheckNodePubkeyInDeposit(_validatorPubkey);
         // Send staking deposit to casper
-        EthDeposit().deposit{value: 4 ether}(_validatorPubkey, StafiNetworkSettings().getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
+        EthDeposit().deposit{value: getCurrentNodeDepositAmount()}(_validatorPubkey, StafiNetworkSettings().getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
 
         emit Deposited(msg.sender, _validatorPubkey);
     }
@@ -156,7 +165,7 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
     function _stake(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) private {
         setAndCheckNodePubkeyInStake(_validatorPubkey);
         // Send staking deposit to casper
-        EthDeposit().deposit{value: 28 ether}(_validatorPubkey, StafiNetworkSettings().getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
+        EthDeposit().deposit{value: uint256(32 ether).sub(getCurrentNodeDepositAmount())}(_validatorPubkey, StafiNetworkSettings().getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
 
         emit Staked(msg.sender, _validatorPubkey);
     }
@@ -176,7 +185,7 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
         // check status
         require(getLightNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_UNINITIAL, "pubkey status unmatch");
         // set pubkey status
-        setLightNodePubkeyStatus(_pubkey, PUBKEY_STATUS_INITIAL);
+        _setLightNodePubkeyStatus(_pubkey, PUBKEY_STATUS_INITIAL);
         // add pubkey to set
         PubkeySetStorage().addItem(keccak256(abi.encodePacked("lightNode.pubkeys.index", msg.sender)), _pubkey);
     }
@@ -186,7 +195,7 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
         // check status
         require(getLightNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_MATCH, "pubkey status unmatch");
         // set pubkey status
-        setLightNodePubkeyStatus(_pubkey, PUBKEY_STATUS_STAKING);
+        _setLightNodePubkeyStatus(_pubkey, PUBKEY_STATUS_STAKING);
     }
     
     // Set and check a node's validator pubkey
@@ -197,7 +206,7 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
         require(PubkeySetStorage().getIndexOf(keccak256(abi.encodePacked("lightNode.pubkeys.index", msg.sender)), _pubkey) >= 0, "not pubkey owner");
         
         // set pubkey status
-        setLightNodePubkeyStatus(_pubkey, PUBKEY_STATUS_OFFBOARD);
+        _setLightNodePubkeyStatus(_pubkey, PUBKEY_STATUS_OFFBOARD);
     }
     
     // Only accepts calls from trusted (oracle) nodes
@@ -218,7 +227,7 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
         uint256 calcBase = 1 ether;
         IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
         if (getLightNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_INITIAL &&  calcBase.mul(totalVotes) >= stafiNodeManager.getTrustedNodeCount().mul(StafiNetworkSettings().getNodeConsensusThreshold())) {
-            setLightNodePubkeyStatus(_pubkey, _match ? PUBKEY_STATUS_MATCH : PUBKEY_STATUS_UNMATCH);
+            _setLightNodePubkeyStatus(_pubkey, _match ? PUBKEY_STATUS_MATCH : PUBKEY_STATUS_UNMATCH);
         }
     }
 }

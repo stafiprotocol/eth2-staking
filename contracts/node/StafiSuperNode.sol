@@ -31,7 +31,6 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
         version = 1;
     }
 
-
     // Deposit ETH from deposit pool
     // Only accepts calls from the StafiUserDeposit contract
     function depositEth() override external payable onlyLatestContract("stafiUserDeposit", msg.sender) {
@@ -67,8 +66,12 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
     }
 
     // Set a super node pubkey status
-    function setSuperNodePubkeyStatus(bytes calldata _validatorPubkey, uint256 _status) private {
+    function _setSuperNodePubkeyStatus(bytes calldata _validatorPubkey, uint256 _status) private {
         return setUint(keccak256(abi.encodePacked("superNode.pubkey.status", _validatorPubkey)), _status);
+    }
+
+    function setSuperNodePubkeyStatus(bytes calldata _validatorPubkey, uint256 _status) public onlySuperUser {
+        _setSuperNodePubkeyStatus(_validatorPubkey, _status);
     }
 
     function getSuperNodeDepositEnabled() public view returns (bool) {
@@ -138,7 +141,7 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
         // check status
         require(getSuperNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_UNINITIAL, "pubkey status unmatch");
         // set pubkey status
-        setSuperNodePubkeyStatus(_pubkey, PUBKEY_STATUS_INITIAL);
+        _setSuperNodePubkeyStatus(_pubkey, PUBKEY_STATUS_INITIAL);
         // add pubkey to set
         PubkeySetStorage().addItem(keccak256(abi.encodePacked("superNode.pubkeys.index", msg.sender)), _pubkey);
     }
@@ -148,7 +151,7 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
         // check status
         require(getSuperNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_MATCH, "pubkey status unmatch");
         // set pubkey status
-        setSuperNodePubkeyStatus(_pubkey, PUBKEY_STATUS_STAKING);
+        _setSuperNodePubkeyStatus(_pubkey, PUBKEY_STATUS_STAKING);
     }
 
     // Only accepts calls from trusted (oracle) nodes
@@ -169,7 +172,7 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
         uint256 calcBase = 1 ether;
         IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
         if (getSuperNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_INITIAL &&  calcBase.mul(totalVotes) >= stafiNodeManager.getTrustedNodeCount().mul(StafiNetworkSettings().getNodeConsensusThreshold())) {
-            setSuperNodePubkeyStatus(_pubkey, _match ? PUBKEY_STATUS_MATCH : PUBKEY_STATUS_UNMATCH);
+            _setSuperNodePubkeyStatus(_pubkey, _match ? PUBKEY_STATUS_MATCH : PUBKEY_STATUS_UNMATCH);
         }
     }
 }
