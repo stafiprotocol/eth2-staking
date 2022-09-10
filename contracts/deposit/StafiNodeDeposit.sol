@@ -18,6 +18,8 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
     using SafeMath for uint256;
     // Events
     event DepositReceived(address indexed from, uint256 amount, uint256 time);
+    event Deposited(address node, address pool, bytes validatorPubkey, bytes validatorSignature, uint256 amount);
+    event Staked(address node, bytes validatorPubkey);
 
     // Construct
     constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
@@ -56,32 +58,34 @@ contract StafiNodeDeposit is StafiBase, IStafiNodeDeposit {
         else if (depositValue == stafiStakingPoolSettings.getEightDepositNodeAmount()) { depositType = DepositType.EIGHT; }
         else if (depositValue == stafiStakingPoolSettings.getTwelveDepositNodeAmount()) { depositType = DepositType.TWELVE; }
         else if (depositValue == stafiStakingPoolSettings.getSixteenDepositNodeAmount()) { depositType = DepositType.SIXTEEN; }
-
-        IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
-        if (depositType == DepositType.None && stafiNodeManager.getNodeTrusted(msg.sender)) {
-            depositType = DepositType.Empty;
-        }
         // Check deposit type
         require(depositType != DepositType.None, "Invalid node deposit amount");
+
+        IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
         // Emit deposit received event
         emit DepositReceived(msg.sender, depositValue, block.timestamp);
         // Register the node
         stafiNodeManager.registerNode(msg.sender);
         // Create staking pool
-        // address stakingPoolAddress = stafiStakingPoolManager.createStakingPool(msg.sender, depositType);
-        IStafiStakingPool stakingPool = IStafiStakingPool(stafiStakingPoolManager.createStakingPool(msg.sender, depositType));
+        address stakingPoolAddress = stafiStakingPoolManager.createStakingPool(msg.sender, depositType);
+        IStafiStakingPool stakingPool = IStafiStakingPool(stakingPoolAddress);
         // Transfer deposit to staking pool
         stakingPool.nodeDeposit{value: depositValue}(_validatorPubkey, _validatorSignature, _depositDataRoot);
         // Assign deposits if enabled
         stafiUserDeposit.assignDeposits();
+
+        emit Deposited(msg.sender, stakingPoolAddress, _validatorPubkey, _validatorSignature, depositValue);
     }
 
     function stake(address[] calldata _stakingPools, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external onlyLatestContract("stafiNodeDeposit", address(this)) {
         require(_validatorSignatures.length == _depositDataRoots.length && _stakingPools.length == _validatorSignatures.length, "params len err");
+        IStafiStakingPoolManager stafiStakingPoolManager = IStafiStakingPoolManager(getContractAddress("stafiStakingPoolManager"));
 
         for (uint256 i = 0; i < _validatorSignatures.length; i++) {
             IStafiStakingPool stakingPool = IStafiStakingPool(_stakingPools[i]);
             stakingPool.stake(_validatorSignatures[i], _depositDataRoots[i]);
+
+            emit Staked(msg.sender, stafiStakingPoolManager.getStakingPoolPubkey(_stakingPools[i]));
         }
     }
 

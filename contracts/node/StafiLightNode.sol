@@ -19,10 +19,10 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
     using SafeMath for uint256;
 
     event EtherDeposited(address indexed from, uint256 amount, uint256 time);
-    event Staked(address indexed node, bytes pubkey);
-    event Deposited(address indexed node, bytes pubkey);
-    event OffBoarded(address indexed node, bytes pubkey);
-    event VoteWithdrawalCredentials(address node, bytes pubkey);
+    event Deposited(address node, bytes pubkey, bytes validatorSignature, uint256 amount);
+    event Staked(address node, bytes pubkey);
+    event OffBoarded(address node, bytes pubkey);
+    event SetPubkeyStatus(bytes pubkey, uint256 status);
 
     uint256 public constant PUBKEY_STATUS_UNINITIAL = 0;
     uint256 public constant PUBKEY_STATUS_INITIAL = 1;
@@ -78,7 +78,9 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
 
     // Set a light node pubkey status
     function _setLightNodePubkeyStatus(bytes calldata _validatorPubkey, uint256 _status) private {
-        return setUint(keccak256(abi.encodePacked("lightNode.pubkey.status", _validatorPubkey)), _status);
+        setUint(keccak256(abi.encodePacked("lightNode.pubkey.status", _validatorPubkey)), _status);
+        
+        emit SetPubkeyStatus(_validatorPubkey, _status);
     }
 
     function setLightNodePubkeyStatus(bytes calldata _validatorPubkey, uint256 _status) public onlySuperUser {
@@ -92,6 +94,10 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
 
     function getLightNodeDepositEnabled() public view returns (bool) {
         return getBoolS("settings.lightNode.deposit.enabled");
+    }
+    
+    function getPubkeyVoted(bytes calldata _validatorPubkey, address user) public view returns (bool) {
+        return getBool(keccak256(abi.encodePacked("lightNode.memberVotes.", _validatorPubkey, user)));
     }
 
     function setLightNodeDepositEnabled(bool _value) public onlySuperUser {
@@ -159,7 +165,7 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
         // Send staking deposit to casper
         EthDeposit().deposit{value: getCurrentNodeDepositAmount()}(_validatorPubkey, StafiNetworkSettings().getWithdrawalCredentials(), _validatorSignature, _depositDataRoot);
 
-        emit Deposited(msg.sender, _validatorPubkey);
+        emit Deposited(msg.sender, _validatorPubkey, _validatorSignature, getCurrentNodeDepositAmount());
     }
 
     function _stake(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) private {
@@ -219,9 +225,6 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
         uint256 totalVotes = getUint(keccak256(abi.encodePacked("lightNode.totalVotes", _pubkey, _match)));
         totalVotes = totalVotes.add(1);
         setUint(keccak256(abi.encodePacked("lightNode.totalVotes", _pubkey, _match)), totalVotes);
-       
-        // Emit event
-        emit VoteWithdrawalCredentials(msg.sender, _pubkey);
        
         // Check count and set status
         uint256 calcBase = 1 ether;

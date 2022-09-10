@@ -26,7 +26,6 @@ contract StafiStakingPoolDelegate is StafiStakingPoolStorage, IStafiStakingPool 
     event EtherDeposited(address indexed from, uint256 amount, uint256 time);
     event EtherRefunded(address indexed node, address indexed stakingPool, uint256 amount, uint256 time);
     event EtherWithdrawn(address indexed to, uint256 amount, uint256 time);
-    event StakingPoolPrestaked(bytes validatorPubkey, bytes validatorSignature, bytes32 depositDataRoot, uint256 amount, bytes withdrawalCredentials, uint256 time);
     event VoteWithdrawalCredentials(address node);
 
     // Status getters
@@ -146,10 +145,9 @@ contract StafiStakingPoolDelegate is StafiStakingPoolStorage, IStafiStakingPool 
 
         // Set stakingPool pubkey
         stafiStakingPoolManager.setStakingPoolPubkey(_validatorPubkey);
-        // prestake if necessary
-        if (depositType != DepositType.Empty) {
-            preStake(_validatorPubkey, _validatorSignature, _depositDataRoot);
-        }
+
+        preStake(_validatorPubkey, _validatorSignature, _depositDataRoot);
+        
     }
 
     // Assign user deposited ETH to the staking pool and mark it as prelaunch
@@ -176,7 +174,7 @@ contract StafiStakingPoolDelegate is StafiStakingPoolStorage, IStafiStakingPool 
         // Check current status
         require(status == StakingPoolStatus.Prelaunch, "status unmatch");
         // Check withdrawCredentials match
-        require(withdrawalCredentialsMatch || depositType == DepositType.Empty, "invalid withdraw credentials");
+        require(withdrawalCredentialsMatch, "invalid withdraw credentials");
         // Check staking pool balance
         require(address(this).balance >= userDepositBalance, "Insufficient balance");
         // Send staking deposit to casper
@@ -195,8 +193,6 @@ contract StafiStakingPoolDelegate is StafiStakingPoolStorage, IStafiStakingPool 
         bytes memory withdrawalCredentials = StafiNetworkSettings().getWithdrawalCredentials();
         // Send staking deposit to casper
         EthDeposit().deposit{value : nodeDepositBalance}(_validatorPubkey, withdrawalCredentials, _validatorSignature, _depositDataRoot);
-        // Emit event
-        emit StakingPoolPrestaked(_validatorPubkey, _validatorSignature, _depositDataRoot, nodeDepositBalance, withdrawalCredentials, block.timestamp);
     }
 
     // Only accepts calls from trusted (oracle) nodes
