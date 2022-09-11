@@ -262,9 +262,9 @@ contract StafiStakingPoolDelegate is StafiStakingPoolStorage, IStafiStakingPool 
         if (!userDepositAssigned) { IStafiStakingPoolQueue(getContractAddress("stafiStakingPoolQueue")).removeStakingPool(); }
         // Transfer user balance to deposit pool
         if (userDepositBalance > 0) {
+            userDepositBalance = 0;
             // Transfer
             stafiUserDeposit.recycleDissolvedDeposit{value: userDepositBalance}();
-            userDepositBalance = 0;
             // Emit ether withdrawn event
             emit EtherWithdrawn(address(stafiUserDeposit), userDepositBalance, block.timestamp);
         }

@@ -200,6 +200,9 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
     function setAndCheckNodePubkeyInStake(bytes calldata _pubkey) private {
         // check status
         require(getLightNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_MATCH, "pubkey status unmatch");
+        // check owner
+        require(PubkeySetStorage().getIndexOf(keccak256(abi.encodePacked("lightNode.pubkeys.index", msg.sender)), _pubkey) >= 0, "not pubkey owner");
+        
         // set pubkey status
         _setLightNodePubkeyStatus(_pubkey, PUBKEY_STATUS_STAKING);
     }
