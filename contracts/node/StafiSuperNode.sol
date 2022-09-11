@@ -91,7 +91,7 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
     function deposit(bytes[] calldata _validatorPubkeys, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external onlyLatestContract("stafiSuperNode", address(this)) onlySuperNode(msg.sender) {
         require(getSuperNodeDepositEnabled(), "super node deposits are currently disabled");
         uint256 len = _validatorPubkeys.length;
-        require(len == _validatorSignatures.length && len == _depositDataRoots.length);
+        require(len == _validatorSignatures.length && len == _depositDataRoots.length, "params len err");
         require(getSuperNodePubkeyCount(msg.sender).add(len) <= StafiNetworkSettings().getSuperNodePubkeyLimit(), "pubkey amount over limit");
         // Load contracts
         IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
@@ -104,7 +104,7 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
 
     function stake(bytes[] calldata _validatorPubkeys, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external onlyLatestContract("stafiSuperNode", address(this)) onlySuperNode(msg.sender) {
         uint256 len = _validatorPubkeys.length;
-        require(len == _validatorSignatures.length && len == _depositDataRoots.length);
+        require(len == _validatorSignatures.length && len == _depositDataRoots.length, "params len err");
         // Load contracts
         IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
         stafiUserDeposit.withdrawExcessBalanceForSuperNode(len.mul(31 ether));
@@ -160,8 +160,15 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
         _setSuperNodePubkeyStatus(_pubkey, PUBKEY_STATUS_STAKING);
     }
 
+    function voteWithdrawCredentials(bytes[] calldata _pubkeys, bool[] calldata _matchs) override external onlyLatestContract("stafiSuperNode", address(this)) onlyTrustedNode(msg.sender) {
+        require(_pubkeys.length == _matchs.length, "params len err");
+        for ( uint256 i = 0; i < _pubkeys.length; i++) {
+            _voteWithdrawCredentials(_pubkeys[i], _matchs[i]);
+        }
+    }
+
     // Only accepts calls from trusted (oracle) nodes
-    function voteWithdrawCredentials(bytes calldata _pubkey, bool _match) override external onlyLatestContract("stafiSuperNode", address(this)) onlyTrustedNode(msg.sender) {
+    function _voteWithdrawCredentials(bytes calldata _pubkey, bool _match) private {
         // Check & update node vote status
         require(!getBool(keccak256(abi.encodePacked("superNode.memberVotes.", _pubkey, msg.sender))), "Member has already voted to withdrawCredentials");
         setBool(keccak256(abi.encodePacked("superNode.memberVotes.", _pubkey, msg.sender)), true);

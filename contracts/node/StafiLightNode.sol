@@ -116,7 +116,7 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
     }
 
     function stake(bytes[] calldata _validatorPubkeys, bytes[] calldata _validatorSignatures, bytes32[] calldata _depositDataRoots) override external onlyLatestContract("stafiLightNode", address(this)) {
-        require(_validatorPubkeys.length == _validatorSignatures.length && _validatorPubkeys.length == _depositDataRoots.length);
+        require(_validatorPubkeys.length == _validatorSignatures.length && _validatorPubkeys.length == _depositDataRoots.length, "params len err");
         // Load contracts
         IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
         stafiUserDeposit.withdrawExcessBalanceForLightNode(_validatorPubkeys.length.mul(uint256(32 ether).sub(getCurrentNodeDepositAmount())));
@@ -202,7 +202,7 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
         require(getLightNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_MATCH, "pubkey status unmatch");
         // check owner
         require(PubkeySetStorage().getIndexOf(keccak256(abi.encodePacked("lightNode.pubkeys.index", msg.sender)), _pubkey) >= 0, "not pubkey owner");
-        
+
         // set pubkey status
         _setLightNodePubkeyStatus(_pubkey, PUBKEY_STATUS_STAKING);
     }
@@ -217,9 +217,15 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
         // set pubkey status
         _setLightNodePubkeyStatus(_pubkey, PUBKEY_STATUS_OFFBOARD);
     }
-    
+
     // Only accepts calls from trusted (oracle) nodes
-    function voteWithdrawCredentials(bytes calldata _pubkey, bool _match) override external onlyLatestContract("stafiLightNode", address(this)) onlyTrustedNode(msg.sender) {
+    function voteWithdrawCredentials(bytes[] calldata _pubkeys, bool[] calldata _matchs) override external onlyLatestContract("stafiLightNode", address(this)) onlyTrustedNode(msg.sender) {
+        require(_pubkeys.length == _matchs.length, "params len err");
+        for (uint256 i = 0; i < _pubkeys.length; i++) {
+            _voteWithdrawCredentials(_pubkeys[i], _matchs[i]);
+        }
+    }
+    function _voteWithdrawCredentials(bytes calldata _pubkey, bool _match) private {
         // Check & update node vote status
         require(!getBool(keccak256(abi.encodePacked("lightNode.memberVotes.", _pubkey, msg.sender))), "Member has already voted to withdrawCredentials");
         setBool(keccak256(abi.encodePacked("lightNode.memberVotes.", _pubkey, msg.sender)), true);

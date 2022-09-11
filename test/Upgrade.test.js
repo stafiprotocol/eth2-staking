@@ -305,10 +305,8 @@ describe("upgrade test", function () {
         console.log("super node deposit tx gas: ", nodeDepositTxRecipient.gasUsed.toString())
 
         // trust node vote withdrawCredentials
-        await this.ContractStafiSuperNode.connect(this.TrustNode1).voteWithdrawCredentials(depositDataInDeposit.pubkey, true)
-        await this.ContractStafiSuperNode.connect(this.TrustNode2).voteWithdrawCredentials(depositDataInDeposit.pubkey, true)
-        await this.ContractStafiSuperNode.connect(this.TrustNode1).voteWithdrawCredentials(depositDataInDeposit2.pubkey, true)
-        await this.ContractStafiSuperNode.connect(this.TrustNode2).voteWithdrawCredentials(depositDataInDeposit2.pubkey, true)
+        await this.ContractStafiSuperNode.connect(this.TrustNode1).voteWithdrawCredentials([depositDataInDeposit.pubkey, depositDataInDeposit2.pubkey], [true, true])
+        await this.ContractStafiSuperNode.connect(this.TrustNode2).voteWithdrawCredentials([depositDataInDeposit.pubkey, depositDataInDeposit2.pubkey], [true, true])
 
         // node deposit
         let depositDataInStake = {

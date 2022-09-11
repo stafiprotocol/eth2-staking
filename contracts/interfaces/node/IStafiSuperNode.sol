@@ -9,5 +9,5 @@ interface IStafiSuperNode {
     function getSuperNodePubkeyCount(address _nodeAddress) external view returns (uint256);
     function getSuperNodePubkeyAt(address _nodeAddress, uint256 _index) external view returns (bytes memory);
     function getSuperNodePubkeyStatus(bytes calldata _validatorPubkey) external view returns (uint256);
-    function voteWithdrawCredentials(bytes calldata _pubkey, bool _match) external;
+    function voteWithdrawCredentials(bytes[] calldata _pubkey, bool[] calldata _match) external;
 }

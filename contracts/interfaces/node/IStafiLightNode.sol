@@ -12,5 +12,5 @@ interface IStafiLightNode {
     function getLightNodePubkeyCount(address _nodeAddress) external view returns (uint256);
     function getLightNodePubkeyAt(address _nodeAddress, uint256 _index) external view returns (bytes memory);
     function getLightNodePubkeyStatus(bytes calldata _validatorPubkey) external view returns (uint256);
-    function voteWithdrawCredentials(bytes calldata _pubkey, bool _match) external;
+    function voteWithdrawCredentials(bytes[] calldata _pubkey, bool[] calldata _match) external;
 }

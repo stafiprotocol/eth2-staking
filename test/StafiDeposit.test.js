@@ -340,8 +340,7 @@ describe("StafiDeposit", function () {
         console.log("super node deposit tx gas: ", nodeDepositTxRecipient.gasUsed.toString())
 
         // trust node vote withdrawCredentials
-        await this.ContractStafiSuperNode.connect(this.AccountTrustNode1).voteWithdrawCredentials(depositDataInDeposit.pubkey, true)
-        await this.ContractStafiSuperNode.connect(this.AccountTrustNode1).voteWithdrawCredentials(depositDataInDeposit2.pubkey, true)
+        await this.ContractStafiSuperNode.connect(this.AccountTrustNode1).voteWithdrawCredentials([depositDataInDeposit.pubkey, depositDataInDeposit2.pubkey], [true, true])
 
         expect((await this.ContractStafiSuperNode.getSuperNodePubkeyStatus(depositDataInDeposit.pubkey)).toString()).to.equal("2")
         expect((await this.ContractStafiSuperNode.getSuperNodePubkeyStatus(depositDataInDeposit2.pubkey)).toString()).to.equal("2")
@@ -415,8 +414,7 @@ describe("StafiDeposit", function () {
         console.log("light node deposit tx gas: ", nodeDepositTxRecipient.gasUsed.toString())
 
         // trust node vote withdrawCredentials
-        await this.ContractStafiLightNode.connect(this.AccountTrustNode1).voteWithdrawCredentials(depositDataInDeposit.pubkey, true)
-        await this.ContractStafiLightNode.connect(this.AccountTrustNode1).voteWithdrawCredentials(depositDataInDeposit2.pubkey, true)
+        await this.ContractStafiLightNode.connect(this.AccountTrustNode1).voteWithdrawCredentials([depositDataInDeposit.pubkey, depositDataInDeposit2.pubkey], [true, true])
 
         expect((await this.ContractStafiLightNode.getLightNodePubkeyStatus(depositDataInDeposit.pubkey)).toString()).to.equal("2")
         expect((await this.ContractStafiLightNode.getLightNodePubkeyStatus(depositDataInDeposit2.pubkey)).toString()).to.equal("2")
@@ -468,7 +466,7 @@ describe("StafiDeposit", function () {
         let nodeDepositTxRecipient3 = await nodeDepositTx3.wait()
         console.log("light node deposit tx3 gas: ", nodeDepositTxRecipient3.gasUsed.toString())
         // trust node vote withdrawCredentials
-        await this.ContractStafiLightNode.connect(this.AccountTrustNode1).voteWithdrawCredentials(depositDataInDeposit3.pubkey, true)
+        await this.ContractStafiLightNode.connect(this.AccountTrustNode1).voteWithdrawCredentials([depositDataInDeposit3.pubkey], [true])
 
         await this.ContractStafiLightNode.connect(this.AccountUser2).offBoard(depositDataInDeposit3.pubkey, { from: this.AccountUser2.address })
         await this.ContractStafiLightNode.connect(this.AccountUser1).provideNodeDepositToken(depositDataInDeposit3.pubkey, { from: this.AccountUser1.address, value: web3.utils.toWei('4', 'ether') });
