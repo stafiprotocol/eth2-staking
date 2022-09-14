@@ -55,6 +55,10 @@ contract StafiNetworkBalances is StafiBase, IStafiNetworkBalances {
         setUintS("network.balance.reth.supply", _value);
     }
 
+    function nodeVoted(address sender, uint256 _block, uint256 _totalEth, uint256 _stakingEth, uint256 _rethSupply) override public view returns (bool) {
+        bytes32 nodeSubmissionKey = keccak256(abi.encodePacked("network.balances.submitted.node", sender, _block, _totalEth, _stakingEth, _rethSupply));
+        return getBool(nodeSubmissionKey);
+    }
     // Get the current network ETH staking rate as a fraction of 1 ETH
     // Represents what % of the network's balance is actively earning rewards
     function getETHStakingRate() override public view returns (uint256) {

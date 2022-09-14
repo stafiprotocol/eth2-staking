@@ -39,6 +39,12 @@ npm run test
 npm run size
 ```
 
+# deploy
+
+```
+npx hardhat run deploy.js --network xxxxx
+```
+
 # Credits
 Special thanks to these libraries which have been great references for developing eth2-staking
 
