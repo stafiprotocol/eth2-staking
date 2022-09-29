@@ -179,7 +179,13 @@ async function main() {
     await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeTrusted(this.AccountTrustNode1.address, true)
     await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeSuper(this.AccountSuperNode1.address, true)
 
+    // enable deposit
+    await this.ContractStafiLightNode.connect(this.AccountAdmin).setLightNodeDepositEnabled(true)
+    await this.ContractStafiSuperNode.connect(this.AccountAdmin).setSuperNodeDepositEnabled(true)
+
     console.log("admin balance: ", (await ethers.provider.getBalance(this.AccountAdmin.address)).toString())
+    console.log("trust node address:", this.AccountTrustNode1.address)
+    console.log("super node address:", this.AccountSuperNode1.address)
 }
 
 main()

@@ -134,15 +134,10 @@ contract StafiSuperNode is StafiBase, IStafiSuperNode {
     
     // Set and check a node's validator pubkey
     function setAndCheckNodePubkeyInDeposit(bytes calldata _pubkey) private {
-        // check pubkey of superNodes
-        require(!getBool(keccak256(abi.encodePacked("superNode.pubkey.exists", _pubkey))), "super Node pubkey exists");
-        // set validator pubkey exists in superNodes
-        setBool(keccak256(abi.encodePacked("superNode.pubkey.exists", _pubkey)), true);
         // check pubkey of stakingpools
         require(getAddress(keccak256(abi.encodePacked("validator.stakingpool", _pubkey))) == address(0x0), "stakingpool pubkey exists");
         // check pubkey of lightNodes
-        require(!getBool(keccak256(abi.encodePacked("lightNode.pubkey.exists", _pubkey))), "light Node pubkey exists");
-
+        require(getUint(keccak256(abi.encodePacked("lightNode.pubkey.status", _pubkey))) == PUBKEY_STATUS_UNINITIAL, "light Node pubkey exists");
 
         // check status
         require(getSuperNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_UNINITIAL, "pubkey status unmatch");

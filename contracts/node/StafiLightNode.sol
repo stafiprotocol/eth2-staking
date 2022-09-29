@@ -178,15 +178,10 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
 
     // Set and check a node's validator pubkey
     function setAndCheckNodePubkeyInDeposit(bytes calldata _pubkey) private {
-        // check pubkey of lightNodes
-        require(!getBool(keccak256(abi.encodePacked("lightNode.pubkey.exists", _pubkey))), "light Node pubkey exists");
-        // set validator pubkey exists in lightNodes
-        setBool(keccak256(abi.encodePacked("lightNode.pubkey.exists", _pubkey)), true);
         // check pubkey of stakingpools
         require(getAddress(keccak256(abi.encodePacked("validator.stakingpool", _pubkey))) == address(0x0), "stakingpool pubkey exists");
         // check pubkey of superNodes
-        require(!getBool(keccak256(abi.encodePacked("superNode.pubkey.exists", _pubkey))), "super Node pubkey exists");
-
+        require(getUint(keccak256(abi.encodePacked("superNode.pubkey.status", _pubkey))) == PUBKEY_STATUS_UNINITIAL, "super Node pubkey exists");
 
         // check status
         require(getLightNodePubkeyStatus(_pubkey) == PUBKEY_STATUS_UNINITIAL, "pubkey status unmatch");
