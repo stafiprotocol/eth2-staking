@@ -3,3 +3,5 @@ build/
 node_modules/
 cache/
 compiler_config.json
+deposit_test.js
+upgrade_dev.js

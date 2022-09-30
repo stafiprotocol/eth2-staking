@@ -42,7 +42,7 @@ npm run size
 # deploy
 
 ```
-npx hardhat run deploy.js --network xxxxx
+npx hardhat run deploy_test.js --network xxxxx
 ```
 
 # Credits

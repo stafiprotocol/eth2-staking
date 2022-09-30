@@ -1,15 +1,11 @@
 const { ethers, web3 } = require("hardhat")
-const { time, beacon } = require("./test/utilities")
+
 
 async function main() {
     this.signers = await ethers.getSigners()
     this.AccountAdmin = this.signers[0]
     this.AccountTrustNode1 = this.signers[1]
     this.AccountSuperNode1 = this.signers[2]
-    this.AccountUser1 = this.signers[3]
-    this.AccountNode1 = this.signers[4]
-    this.AccountUser2 = this.signers[5]
-
 
     this.FactoryStafiNodeDeposit = await ethers.getContractFactory("StafiNodeDeposit", this.AccountAdmin)
     this.FactoryStafiUserDeposit = await ethers.getContractFactory("StafiUserDeposit", this.AccountAdmin)
@@ -177,74 +173,19 @@ async function main() {
 
     await this.ContractStafiUpgrade.initStorage(true)
 
-    this.WithdrawalCredentials = '0x00d0d8e23e26afa86382b1f1e7b7af7b5d431bfa68d3b3f3c2fe2a6e54353fa8'
+    this.WithdrawalCredentials = '0x003cd051a5757b82bf2c399d7476d1636473969af698377434af1d6c54f2bee9'
     await this.ContractStafiNetworkSettings.setWithdrawalCredentials(this.WithdrawalCredentials)
 
     await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeTrusted(this.AccountTrustNode1.address, true)
     await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeSuper(this.AccountSuperNode1.address, true)
 
-    console.log("admin balance: ", (await ethers.provider.getBalance(this.AccountAdmin.address)).toString())
-
-
-    // user deposit
-    let userDepositTx1 = await this.ContractStafiUserDeposit.connect(this.AccountUser1).deposit({ from: this.AccountUser1.address, value: web3.utils.toWei('28', 'ether') })
-    let userDepositTxRecipient1 = await userDepositTx1.wait()
-    console.log("user deposit tx gas: ", userDepositTxRecipient1.gasUsed.toString())
-
-    // node deposit
-    let depositData = {
-        pubkey: beacon.getValidatorPubkey(),
-        withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
-        amount: BigInt(4000000000), // gwei
-        signature: beacon.getValidatorSignature(),
-    };
-    let depositData2 = {
-        pubkey: beacon.getValidatorPubkey(),
-        withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
-        amount: BigInt(4000000000), // gwei
-        signature: beacon.getValidatorSignature(),
-    };
-    let depositDataRoot = beacon.getDepositDataRoot(depositData);
-    let depositDataRoot2 = beacon.getDepositDataRoot(depositData2);
-
-    let nodeDepositTx1 = await this.ContracStafiNodeDeposit.connect(this.AccountNode1).deposit(
-        [depositData.pubkey, depositData2.pubkey], [depositData.signature, depositData2.signature], [depositDataRoot, depositDataRoot2], { from: this.AccountNode1.address, value: web3.utils.toWei('8', 'ether') })
-
-    let nodeDepositTxRecipient1 = await nodeDepositTx1.wait()
-    console.log("node deposit tx gas: ", nodeDepositTxRecipient1.gasUsed.toString())
-
-
-
     // enable deposit
     await this.ContractStafiLightNode.connect(this.AccountAdmin).setLightNodeDepositEnabled(true)
-    // user deposit
-    let userDepositTx = await this.ContractStafiUserDeposit.connect(this.AccountUser1).deposit({ from: this.AccountUser1.address, value: web3.utils.toWei('68', 'ether') })
-    let userDepositTxRecipient = await userDepositTx.wait()
-    console.log("user deposit tx gas: ", userDepositTxRecipient.gasUsed.toString())
+    await this.ContractStafiSuperNode.connect(this.AccountAdmin).setSuperNodeDepositEnabled(true)
 
-    // node deposit
-    let depositDataInDeposit = {
-        pubkey: beacon.getValidatorPubkey(),
-        withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
-        amount: BigInt(4000000000), // gwei
-        signature: beacon.getValidatorSignature(),
-    };
-
-    let depositDataInDeposit2 = {
-        pubkey: beacon.getValidatorPubkey(),
-        withdrawalCredentials: Buffer.from(this.WithdrawalCredentials.substr(2), 'hex'),
-        amount: BigInt(4000000000), // gwei
-        signature: beacon.getValidatorSignature(),
-    };
-    let depositDataInDepositRoot = beacon.getDepositDataRoot(depositDataInDeposit);
-    let depositDataInDepositRoot2 = beacon.getDepositDataRoot(depositDataInDeposit2);
-
-    let nodeDepositTx = await this.ContractStafiLightNode.connect(this.AccountUser2).deposit(
-        [depositDataInDeposit.pubkey, depositDataInDeposit2.pubkey], [depositDataInDeposit.signature, depositDataInDeposit2.signature], [depositDataInDepositRoot, depositDataInDepositRoot2],
-        { from: this.AccountUser2.address, value: web3.utils.toWei('8', 'ether') })
-    let nodeDepositTxRecipient = await nodeDepositTx.wait()
-    console.log("light node deposit tx gas: ", nodeDepositTxRecipient.gasUsed.toString())
-
+    console.log("admin balance: ", (await ethers.provider.getBalance(this.AccountAdmin.address)).toString())
+    console.log("trust node address:", this.AccountTrustNode1.address)
+    console.log("super node address:", this.AccountSuperNode1.address)
 }
 
 main()

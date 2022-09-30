@@ -188,7 +188,7 @@ describe("StafiDeposit", function () {
 
         await this.ContractStafiUpgrade.initStorage(true)
 
-        this.WithdrawalCredentials = '0x00d0d8e23e26afa86382b1f1e7b7af7b5d431bfa68d3b3f3c2fe2a6e54353fa8'
+        this.WithdrawalCredentials = '0x003cd051a5757b82bf2c399d7476d1636473969af698377434af1d6c54f2bee9'
         await this.ContractStafiNetworkSettings.setWithdrawalCredentials(this.WithdrawalCredentials)
 
         await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeTrusted(this.AccountTrustNode1.address, true)
