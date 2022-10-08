@@ -153,11 +153,11 @@ contract StafiLightNode is StafiBase, IStafiLightNode, IStafiEtherWithdrawer {
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
         stafiEther.withdrawEther(getCurrentNodeDepositAmount());
 
-        (bool success,) = (msg.sender).call{value: getCurrentNodeDepositAmount()}("");
-        require(success, "transferr failed");
-
         // set pubkey status
         _setLightNodePubkeyStatus(_validatorPubkey, PUBKEY_STATUS_WITHDRAWED);
+
+        (bool success,) = (msg.sender).call{value: getCurrentNodeDepositAmount()}("");
+        require(success, "transferr failed");
     }
 
     function _deposit(bytes calldata _validatorPubkey, bytes calldata _validatorSignature, bytes32 _depositDataRoot) private {
