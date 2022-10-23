@@ -173,7 +173,7 @@ async function main() {
 
     await this.ContractStafiUpgrade.initStorage(true)
 
-    this.WithdrawalCredentials = '0x003cd051a5757b82bf2c399d7476d1636473969af698377434af1d6c54f2bee9'
+    this.WithdrawalCredentials = '0x00325b04539edc57dfb7d0e3f414ae51f1a601608fa05c79a1660f531084d7ee'
     await this.ContractStafiNetworkSettings.setWithdrawalCredentials(this.WithdrawalCredentials)
 
     await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeTrusted(this.AccountTrustNode1.address, true)
@@ -183,7 +183,7 @@ async function main() {
     await this.ContractStafiLightNode.connect(this.AccountAdmin).setLightNodeDepositEnabled(true)
     await this.ContractStafiSuperNode.connect(this.AccountAdmin).setSuperNodeDepositEnabled(true)
 
-    console.log("admin balance: ", (await ethers.provider.getBalance(this.AccountAdmin.address)).toString())
+    console.log("admin balance: ", this.AccountAdmin.address, (await ethers.provider.getBalance(this.AccountAdmin.address)).toString())
     console.log("trust node address:", this.AccountTrustNode1.address)
     console.log("super node address:", this.AccountSuperNode1.address)
 }

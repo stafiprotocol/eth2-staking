@@ -84,8 +84,8 @@ contract StafiUpgrade is StafiBase, IStafiUpgrade {
         setAddress(keccak256(abi.encodePacked("contract.address", name)), _contractAddress);
         
         if (oldContractAddress != address(0x0)) {
-            deleteBool(keccak256(abi.encodePacked("contract.exists", oldContractAddress)));
             deleteString(keccak256(abi.encodePacked("contract.name", oldContractAddress)));
+            deleteBool(keccak256(abi.encodePacked("contract.exists", oldContractAddress)));
         }
         // Emit contract added event
         emit ContractAdded(nameHash, _contractAddress, block.timestamp);
