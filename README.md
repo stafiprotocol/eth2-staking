@@ -45,6 +45,12 @@ npm run size
 npx hardhat run deploy_test.js --network xxxxx
 ```
 
+# verify in etherscan
+
+```
+npx hardhat verify --network mainnet DEPLOYED_CONTRACT_ADDRESS "Constructor argument 1"
+```
+
 # Credits
 Special thanks to these libraries which have been great references for developing eth2-staking
 
