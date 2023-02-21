@@ -6,6 +6,9 @@ async function main() {
     this.AccountAdmin = this.signers[0]
     this.AccountTrustNode1 = this.signers[1]
     this.AccountSuperNode1 = this.signers[2]
+    console.log("admin: ", this.AccountAdmin.address)
+    console.log("trustNode1: ", this.AccountTrustNode1.address)
+    console.log("superNode1: ", this.AccountSuperNode1.address)
 
     this.FactoryStafiNodeDeposit = await ethers.getContractFactory("StafiNodeDeposit", this.AccountAdmin)
     this.FactoryStafiUserDeposit = await ethers.getContractFactory("StafiUserDeposit", this.AccountAdmin)

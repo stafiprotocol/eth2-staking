@@ -6,7 +6,7 @@ const { expect } = require("chai")
 const { time, beacon } = require("./utilities")
 var balance_tree_1 = __importDefault(require("./src/balance-tree"));
 
-describe("upgrade test", function () {
+describe("upgrade to v2 test", function () {
     before(async function () {
         this.signers = await ethers.getSigners()
 

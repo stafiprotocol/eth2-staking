@@ -6,7 +6,8 @@
   "scripts": {
     "compile": "npx hardhat compile",
     "size": "npx hardhat size-contracts",
-    "test": "npx hardhat test"
+    "test": "npx hardhat test",
+    "clean": "rm -rf ./node_modules"
   },
   "author": "Stafi Technologies",
   "license": "GPL-3.0-only",
