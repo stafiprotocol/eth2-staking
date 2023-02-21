@@ -50,12 +50,16 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
 
     EnumerableSet.AddressSet subAccounts;
     mapping(bytes32 => Proposal) public proposals;
-    mapping(uint256 => UserWithdrawal) public userWithdrawals;
+    mapping(uint256 => UserWithdrawal) public userWithdrawalDetails;
+    mapping(address => uint256[]) public userWithdrawals;
     mapping(address => NodeWithdrawal) public nodeWithdrawals;
+    mapping(uint256 => uint256[]) public ejectedValidators; // withdrawCycle => validatorIndex[]
+    mapping(uint256 => bool) public ejectedValidatorNeedExit; // validatorIndex => needExit
 
     // ------------ events ------------
     event ProposalExecuted(bytes32 indexed proposalId);
-    event NotifyValidatorExit(uint256 validatorIndex);
+    event NotifyValidatorExit(uint256 withdrawCycle, uint256[] ejectedValidators);
+    event AckValidatorExit(uint256 withdrawCycle, uint256[] ejectedValidators);
 
     constructor() StafiBase(address(0)) {
         threshold = 1;
@@ -103,12 +107,14 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
 
         ERC20Burnable(rEthAddress).burnFrom(msg.sender, _rEthAmount);
 
-        userWithdrawals[nextWithdrawIndex] = UserWithdrawal({_amount: ethAmount, _claimed: true});
+        userWithdrawalDetails[nextWithdrawIndex] = UserWithdrawal({_amount: ethAmount, _claimed: true});
+        userWithdrawals[msg.sender].push(nextWithdrawIndex);
 
         (bool result, ) = msg.sender.call{gas: 2300, value: ethAmount}("");
         require(result, "Failed to withdraw ETH");
 
         maxClaimableWithdrawIndex = nextWithdrawIndex;
+
         nextWithdrawIndex = nextWithdrawIndex.add(1);
     }
 
@@ -118,7 +124,9 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
 
         ERC20Burnable(rEthAddress).burnFrom(msg.sender, _rEthAmount);
 
-        userWithdrawals[nextWithdrawIndex] = UserWithdrawal({_amount: ethAmount, _claimed: false});
+        userWithdrawalDetails[nextWithdrawIndex] = UserWithdrawal({_amount: ethAmount, _claimed: false});
+        userWithdrawals[msg.sender].push(nextWithdrawIndex);
+
         nextWithdrawIndex = nextWithdrawIndex.add(1);
     }
 
@@ -126,10 +134,10 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
         uint256 totalAmount;
         for (uint256 i = 0; i < _withdrawIndexList.length; i++) {
             require(_withdrawIndexList[i] <= maxClaimableWithdrawIndex, "not claimable");
-            require(!userWithdrawals[_withdrawIndexList[i]]._claimed, "already claimed");
+            require(!userWithdrawalDetails[_withdrawIndexList[i]]._claimed, "already claimed");
 
-            userWithdrawals[_withdrawIndexList[i]]._claimed = true;
-            totalAmount = totalAmount.add(userWithdrawals[_withdrawIndexList[i]]._amount);
+            userWithdrawalDetails[_withdrawIndexList[i]]._claimed = true;
+            totalAmount = totalAmount.add(userWithdrawalDetails[_withdrawIndexList[i]]._amount);
         }
 
         if (totalAmount > 0) {
@@ -139,7 +147,6 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
     }
 
     // ------------ node withdraw ------------
-
     function nodeClaim() external override {
         NodeWithdrawal memory withdrawal = nodeWithdrawals[msg.sender];
         uint256 totalAmount = withdrawal._totalReward.sub(withdrawal._totalClaimedReward);
@@ -217,17 +224,47 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
         proposals[proposalId] = proposal;
     }
 
-    function notifyValidatorExit(uint256 _withdrawCycle, uint256 _validatorIndex) external override onlySubAccount {
-        bytes32 proposalId = keccak256(abi.encodePacked(_withdrawCycle, _validatorIndex));
+    function notifyValidatorExit(
+        uint256 _withdrawCycle,
+        uint256[] calldata _validatorIndexList
+    ) external override onlySubAccount {
+        bytes32 proposalId = keccak256(abi.encodePacked("notifyValidatorExit", _withdrawCycle, _validatorIndexList));
         Proposal memory proposal = voteProposal(proposalId);
 
         // Finalize if Threshold has been reached
         if (proposal._yesVotesTotal >= threshold) {
-            emit NotifyValidatorExit(_validatorIndex);
+            ejectedValidators[_withdrawCycle] = _validatorIndexList;
+            for (uint256 i = 0; i < _validatorIndexList.length; i++) {
+                ejectedValidatorNeedExit[_validatorIndexList[i]] = true;
+            }
+
+            emit NotifyValidatorExit(_withdrawCycle, _validatorIndexList);
 
             proposal._status = ProposalStatus.Executed;
             emit ProposalExecuted(proposalId);
         }
+        proposals[proposalId] = proposal;
+    }
+
+    function ackValidatorExited(
+        uint256 _withdrawCycle,
+        uint256[] calldata _validatorIndexList
+    ) external onlySubAccount {
+        bytes32 proposalId = keccak256(abi.encodePacked("ackValidatorExited", _withdrawCycle, _validatorIndexList));
+        Proposal memory proposal = voteProposal(proposalId);
+
+        // Finalize if Threshold has been reached
+        if (proposal._yesVotesTotal >= threshold) {
+            for (uint256 i = 0; i < _validatorIndexList.length; i++) {
+                delete (ejectedValidatorNeedExit[_validatorIndexList[i]]);
+            }
+
+            emit NotifyValidatorExit(_withdrawCycle, _validatorIndexList);
+
+            proposal._status = ProposalStatus.Executed;
+            emit ProposalExecuted(proposalId);
+        }
+
         proposals[proposalId] = proposal;
     }
 
