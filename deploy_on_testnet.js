@@ -6,9 +6,6 @@ async function main() {
     this.AccountAdmin = this.signers[0]
     this.AccountTrustNode1 = this.signers[1]
     this.AccountSuperNode1 = this.signers[2]
-    console.log("admin: ", this.AccountAdmin.address)
-    console.log("trustNode1: ", this.AccountTrustNode1.address)
-    console.log("superNode1: ", this.AccountSuperNode1.address)
 
     this.FactoryStafiNodeDeposit = await ethers.getContractFactory("StafiNodeDeposit", this.AccountAdmin)
     this.FactoryStafiUserDeposit = await ethers.getContractFactory("StafiUserDeposit", this.AccountAdmin)
@@ -47,7 +44,7 @@ async function main() {
 
     this.ContractStafiStorage = await this.FactoryStafiStorage.deploy()
     await this.ContractStafiStorage.deployed()
-    console.log("contract stafiStorate address: ", this.ContractStafiStorage.address)
+    console.log("contract stafiStorage address: ", this.ContractStafiStorage.address)
 
     this.ContractStafiUpgrade = await this.FactoryStafiUpgrade.deploy(this.ContractStafiStorage.address)
     await this.ContractStafiUpgrade.deployed()
@@ -61,11 +58,14 @@ async function main() {
     console.log("contract stafiEther address: ", this.ContractStafiEther.address)
     await this.ContractStafiUpgrade.addContract("stafiEther", this.ContractStafiEther.address)
 
+    // Notice: need update on different network
+    // zhejiang: 0x4242424242424242424242424242424242424242
 
-    this.ContractDepositContract = await this.FactoryDepositContract.deploy()
-    await this.ContractDepositContract.deployed()
-    console.log("contract depositContract address: ", this.ContractDepositContract.address)
-    await this.ContractStafiUpgrade.addContract("ethDeposit", this.ContractDepositContract.address)
+    // this.ContractDepositContract = await this.FactoryDepositContract.deploy()
+    // await this.ContractDepositContract.deployed()
+    this.ContractDepositContractAddress = "0x4242424242424242424242424242424242424242"
+    console.log("contract ethDepositContract address: ", this.ContractDepositContractAddress)
+    await this.ContractStafiUpgrade.addContract("ethDeposit", this.ContractDepositContractAddress)
 
 
     this.ContractRETHToken = await this.FactoryRETHToken.deploy(this.ContractStafiStorage.address)

@@ -14,5 +14,9 @@ interface IStafiWithdraw {
     function nodeClaim() external;
 
     // ejector
-    function notifyValidatorExit(uint256 _withdrawCycle, uint256[] calldata _validatorIndex) external;
+    function notifyValidatorExit(
+        uint256 _withdrawCycle,
+        uint256 _ejectedStartWithdrawCycle,
+        uint256[] calldata _validatorIndex
+    ) external;
 }
