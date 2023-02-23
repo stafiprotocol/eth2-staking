@@ -299,6 +299,11 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
         return proposal;
     }
 
+    function emergencyWithdraw() external onlyOwner {
+        (bool success, ) = msg.sender.call{value: address(this).balance}("");
+        require(success, "failed to withdraw");
+    }
+
     // ------------ helper ------------
 
     function currentWithdrawCycle() public view returns (uint256) {
