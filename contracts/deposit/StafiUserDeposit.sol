@@ -12,6 +12,7 @@ import "../interfaces/pool/IStafiStakingPoolQueue.sol";
 import "../interfaces/token/IRETHToken.sol";
 import "../interfaces/node/IStafiSuperNode.sol";
 import "../interfaces/node/IStafiLightNode.sol";
+import "../interfaces/withdraw/IStafiWithdraw.sol";
 
 // Accepts user deposits and mints rETH; handles assignment of deposited ETH to pools
 contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer {
@@ -101,6 +102,14 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         // Process deposit
         processDeposit();
     }
+    
+    // Recycle a deposit from fee collector
+    function recycleWithdrawDeposit() override external payable onlyLatestContract("stafiUserDeposit", address(this)) onlyLatestContract("stafiWithdraw", msg.sender) {
+        // Emit deposit recycled event
+        emit DepositRecycled(msg.sender, msg.value, block.timestamp);
+        // Process deposit
+        processDeposit();
+    }
 
     // Process a deposit
     function processDeposit() private {
@@ -181,6 +190,21 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         // Emit excess withdrawn event
         emit ExcessWithdrawn(msg.sender, _amount, block.timestamp);
     }
+    
+    // Withdraw excess deposit pool balance for light node
+    function withdrawExcessBalanceForWithdraw(uint256 _amount) override external onlyLatestContract("stafiUserDeposit", address(this)) onlyLatestContract("stafiWithdraw", msg.sender) {
+        // Load contracts
+        IStafiWithdraw stafiWithdraw = IStafiWithdraw(getContractAddress("stafiWithdraw"));
+        IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
+        // Check amount
+        require(_amount <= getExcessBalance(), "Insufficient balance for withdrawal");
+        // Withdraw ETH from vault
+        stafiEther.withdrawEther(_amount);
+        // Transfer to superNode contract
+        stafiWithdraw.depositEth{value: _amount}();
+        // Emit excess withdrawn event
+        emit ExcessWithdrawn(msg.sender, _amount, block.timestamp);
+    }
 
     // Deposits currently enabled
     function getDepositEnabled() public view returns (bool) {
@@ -205,14 +229,6 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
     function setMinimumDeposit(uint256 _value) public onlySuperUser {
         setUintS("settings.deposit.minimum", _value);
     }
-
-    // The maximum size of the deposit pool
-    // function getMaximumDepositPoolSize() public view returns (uint256) {
-    //     return getUintS("settings.deposit.pool.maximum");
-    // }
-    // function setMaximumDepositPoolSize(uint256 _value) public onlySuperUser {
-    //     setUintS("settings.deposit.pool.maximum", _value);
-    // }
 
     // The maximum number of deposit assignments to perform at once
     function getMaximumDepositAssignments() public view returns (uint256) {

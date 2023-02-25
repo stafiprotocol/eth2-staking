@@ -2,32 +2,22 @@ pragma solidity 0.7.6;
 // SPDX-License-Identifier: GPL-3.0-only
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/utils/EnumerableSet.sol";
-import "@openzeppelin/contracts/utils/SafeCast.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 import "../StafiBase.sol";
 import "../interfaces/withdraw/IStafiWithdraw.sol";
 import "../interfaces/storage/IStafiStorage.sol";
 import "../interfaces/IStafiEtherWithdrawer.sol";
 import "../interfaces/token/IRETHToken.sol";
+import "../interfaces/settings/IStafiNetworkSettings.sol";
+import "../interfaces/node/IStafiNodeManager.sol";
+import "../interfaces/reward/IStafiDistributor.sol";
+import "../interfaces/deposit/IStafiUserDeposit.sol";
 
+// Notice:
+// 1 proxy admin must be different from owner
+// 2 the new storage needs to be appended to the old storage if this contract is upgraded,
 contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
-    using SafeCast for *;
-    using EnumerableSet for EnumerableSet.AddressSet;
-    using EnumerableSet for EnumerableSet.UintSet;
     using SafeMath for uint256;
-
-    enum ProposalStatus {
-        Inactive,
-        Active,
-        Executed
-    }
-
-    struct Proposal {
-        ProposalStatus _status;
-        uint16 _yesVotes; // bitmap, 16 maximum votes
-        uint8 _yesVotesTotal;
-    }
 
     struct Withdrawal {
         address _address;
@@ -35,71 +25,38 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
         bool _claimed;
     }
 
-    struct NodeInfo {
-        uint256 _latestStatisticBlock;
-        uint256 _totalReward;
-        uint256 _totalClaimedReward;
-        uint256 _totalDeposit; // total deposit amount of exited validators
-        uint256 _totalClaimedDeposit;
-        uint256 _totalSlash;
-        uint256 _totalCoveredSlash;
-    }
-
-    uint8 public threshold;
     uint256 public nextWithdrawIndex;
     uint256 public maxClaimableWithdrawIndex;
     uint256 public ejectedStartCyle;
-    uint256 public latestBalanceUpdateCycle;
-    uint256 public totalUserBalance;
-    uint256 public totalWaitToClaim;
+    uint256 public latestDistributeHeight;
+    uint256 public totalMissingAmountForWithdraw;
     uint256 public withdrawCycleLimit;
 
-    EnumerableSet.AddressSet subAccounts;
-    mapping(bytes32 => Proposal) public proposals;
     mapping(uint256 => Withdrawal) public withdrawalAtIndex;
     mapping(address => uint256[]) public withdrawIndexListOfUser;
     mapping(uint256 => uint256) public totalWithdrawAmountAtCycle;
     mapping(address => mapping(uint256 => uint256)) public userWithdrawAmountAtCycle;
-
-    mapping(address => NodeInfo) public infoOfNode;
     mapping(uint256 => uint256[]) public ejectedValidatorsAtCycle;
 
     // ------------ events ------------
+    event EtherDeposited(address indexed from, uint256 amount, uint256 time);
     event ProposalExecuted(bytes32 indexed proposalId);
     event NotifyValidatorExit(uint256 withdrawCycle, uint256 ejectedStartWithdrawCycle, uint256[] ejectedValidators);
 
     constructor() StafiBase(address(0)) {
-        // By setting the threshold it is not possible to call setup anymore,
-        // so we create a Safe with 0 owners and threshold 1.
+        // By setting the version it is not possible to call setup anymore,
+        // so we create a Safe with version 1.
         // This is an unusable Safe, perfect for the singleton
-        threshold = 1;
+        version = 1;
     }
 
-    function initialize(
-        address[] memory _initialSubAccounts,
-        uint256 _initialThreshold,
-        address _stafiStorageAddress,
-        uint256 _withdrawCycleLimit
-    ) external {
-        require(_initialSubAccounts.length >= _initialThreshold && _initialThreshold > 0, "invalid threshold");
-        require(threshold == 0, "already initizlized");
-
+    function initialize(address _stafiStorageAddress, uint256 _withdrawCycleLimit) external {
+        require(version == 0, "already initizlized");
         // init StafiBase storage
         version = 1;
         stafiStorage = IStafiStorage(_stafiStorageAddress);
-
         // init StafiWithdraw storage
-        threshold = _initialThreshold.toUint8();
-        uint256 initialSubAccountCount = _initialSubAccounts.length;
-        for (uint256 i; i < initialSubAccountCount; i++) {
-            subAccounts.add(_initialSubAccounts[i]);
-        }
         withdrawCycleLimit = _withdrawCycleLimit;
-    }
-
-    modifier onlySubAccount() {
-        require(subAccounts.contains(msg.sender));
-        _;
     }
 
     // Receive eth
@@ -114,25 +71,51 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
         onlyLatestContract("stafiEther", msg.sender)
     {}
 
-    // ------------ user withdraw ------------
-    function userWithdrawInstantly(uint256 _rEthAmount) external override {
-        uint256 ethAmount = processWithdraw(_rEthAmount);
-        require(ethAmount.add(totalWaitToClaim) <= totalUserBalance, "pool balance not enough");
+    // Deposit ETH from deposit pool
+    // Only accepts calls from the StafiUserDeposit contract
+    function depositEth() external payable override onlyLatestContract("stafiUserDeposit", msg.sender) {
+        // Emit ether deposited event
+        emit EtherDeposited(msg.sender, msg.value, block.timestamp);
+    }
 
-        totalUserBalance = totalUserBalance.sub(ethAmount);
+    // ------------ user withdraw ------------
+    function withdrawInstantly(
+        uint256 _rEthAmount
+    ) external override onlyLatestContract("stafiWithdraw", address(this)) {
+        uint256 ethAmount = processWithdraw(_rEthAmount);
+        IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
+        uint256 stakePoolBalance = stafiUserDeposit.getBalance();
+
+        require(ethAmount <= stakePoolBalance, "stake pool balance not enough");
+        stafiUserDeposit.withdrawExcessBalanceForWithdraw(ethAmount);
+
         withdrawalAtIndex[nextWithdrawIndex] = Withdrawal({_address: msg.sender, _amount: ethAmount, _claimed: true});
         (bool result, ) = msg.sender.call{gas: 2300, value: ethAmount}("");
         require(result, "Failed to withdraw ETH");
     }
 
-    function userWithdraw(uint256 _rEthAmount) external override {
+    function withdraw(uint256 _rEthAmount) external override onlyLatestContract("stafiWithdraw", address(this)) {
         uint256 ethAmount = processWithdraw(_rEthAmount);
-        totalWaitToClaim = totalWaitToClaim.add(ethAmount);
+        IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
+        uint256 stakePoolBalance = stafiUserDeposit.getBalance();
+
+        if (stakePoolBalance > 0) {
+            uint256 mvAmount = ethAmount;
+            if (stakePoolBalance < ethAmount) {
+                mvAmount = stakePoolBalance;
+                totalMissingAmountForWithdraw = totalMissingAmountForWithdraw.add(ethAmount.sub(stakePoolBalance));
+            }
+            stafiUserDeposit.withdrawExcessBalanceForWithdraw(mvAmount);
+        } else {
+            totalMissingAmountForWithdraw = totalMissingAmountForWithdraw.add(ethAmount);
+        }
 
         withdrawalAtIndex[nextWithdrawIndex] = Withdrawal({_address: msg.sender, _amount: ethAmount, _claimed: false});
     }
 
-    function userClaim(uint256[] calldata _withdrawIndexList) external override {
+    function claim(
+        uint256[] calldata _withdrawIndexList
+    ) external override onlyLatestContract("stafiWithdraw", address(this)) {
         uint256 totalAmount;
         for (uint256 i = 0; i < _withdrawIndexList.length; i++) {
             require(_withdrawIndexList[i] <= maxClaimableWithdrawIndex, "not claimable");
@@ -142,166 +125,75 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
             totalAmount = totalAmount.add(withdrawalAtIndex[_withdrawIndexList[i]]._amount);
         }
         if (totalAmount > 0) {
-            totalWaitToClaim = totalWaitToClaim.sub(totalAmount);
-            totalUserBalance = totalUserBalance.sub(totalAmount);
-
             (bool result, ) = msg.sender.call{gas: 2300, value: totalAmount}("");
             require(result, "user failed to claim ETH");
         }
     }
 
-    // ------------ node withdraw ------------
-    function nodeClaim() external override {
-        NodeInfo memory info = infoOfNode[msg.sender];
-        uint256 totalAmount = info._totalReward.sub(info._totalClaimedReward);
-        info._totalClaimedReward = info._totalReward;
-        totalAmount = totalAmount.add(info._totalDeposit.sub(info._totalClaimedDeposit));
-        info._totalClaimedDeposit = info._totalDeposit;
-
-        uint256 slashAmount = info._totalSlash.sub(info._totalCoveredSlash);
-        if (totalAmount >= slashAmount) {
-            totalAmount = totalAmount.sub(slashAmount);
-            info._totalCoveredSlash = info._totalSlash;
-        } else {
-            totalAmount = 0;
-            info._totalCoveredSlash = info._totalCoveredSlash.add(totalAmount);
-        }
-
-        infoOfNode[msg.sender] = info;
-
-        if (totalAmount > 0) {
-            (bool result, ) = msg.sender.call{gas: 2300, value: totalAmount}("");
-            require(result, "node failed to claim ETH");
-        }
-    }
-
-    // ------------ vote ------------
-    function updateBalance(
-        uint256 _latestDealedCycle,
-        uint256 _addedUserBalance,
+    // ------------ voter(trust node) ------------
+    function distributeWithdrawals(
+        uint256 _dealedHeight,
+        uint256 _userAmount,
+        uint256 _nodeAmount,
+        uint256 _platformAmount,
         uint256 _maxClaimableWithdrawIndex
-    ) external onlySubAccount {
-        require(_latestDealedCycle < currentWithdrawCycle(), "cycle not exist");
-        require(_latestDealedCycle > latestBalanceUpdateCycle, "cycle already dealed");
+    ) external onlyLatestContract("stafiWithdraw", address(this)) onlyTrustedNode(msg.sender) {
+        require(_dealedHeight > latestDistributeHeight, "height already dealed");
         bytes32 proposalId = keccak256(
-            abi.encodePacked(_latestDealedCycle, _addedUserBalance, _maxClaimableWithdrawIndex)
+            abi.encodePacked(_dealedHeight, _userAmount, _nodeAmount, _platformAmount, _maxClaimableWithdrawIndex)
         );
-        Proposal memory proposal = voteProposal(proposalId);
+        bool needExe = voteProposal(proposalId);
 
         // Finalize if Threshold has been reached
-        if (proposal._yesVotesTotal >= threshold) {
-            totalUserBalance = totalUserBalance.add(_addedUserBalance);
-
+        if (needExe) {
             maxClaimableWithdrawIndex = _maxClaimableWithdrawIndex;
-            latestBalanceUpdateCycle = _latestDealedCycle;
+            latestDistributeHeight = _dealedHeight;
 
-            proposal._status = ProposalStatus.Executed;
-            emit ProposalExecuted(proposalId);
-        }
-        proposals[proposalId] = proposal;
-    }
-
-    function updateNodeReward(
-        uint256 _latestStatisticBlock,
-        address[] calldata _addresses,
-        uint256[] calldata _rewards,
-        uint256[] calldata _deposits,
-        uint256[] calldata _slashs
-    ) external onlySubAccount {
-        bytes32 proposalId = keccak256(
-            abi.encodePacked(_latestStatisticBlock, _addresses, _rewards, _deposits, _slashs)
-        );
-        Proposal memory proposal = voteProposal(proposalId);
-
-        // Finalize if Threshold has been reached
-        if (proposal._yesVotesTotal >= threshold) {
-            for (uint256 i = 0; i < _addresses.length; i++) {
-                NodeInfo memory info = infoOfNode[_addresses[i]];
-
-                info._latestStatisticBlock = _latestStatisticBlock;
-                info._totalReward = info._totalReward.add(_rewards[i]);
-                info._totalDeposit = info._totalDeposit.add(_deposits[i]);
-                info._totalSlash = info._totalSlash.add(_slashs[i]);
-
-                infoOfNode[_addresses[i]] = info;
+            uint256 mvAmount = _userAmount;
+            if (totalMissingAmountForWithdraw < _userAmount) {
+                mvAmount = _userAmount.sub(totalMissingAmountForWithdraw);
+                totalMissingAmountForWithdraw = 0;
+            } else {
+                mvAmount = 0;
+                totalMissingAmountForWithdraw = totalMissingAmountForWithdraw.sub(_userAmount);
             }
 
-            proposal._status = ProposalStatus.Executed;
-            emit ProposalExecuted(proposalId);
+            if (mvAmount > 0) {
+                IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
+                stafiUserDeposit.recycleWithdrawDeposit{value: _userAmount}();
+            }
+
+            // distribute withdrawals
+            IStafiDistributor stafiDistributor = IStafiDistributor(getContractAddress("stafiDistributor"));
+            uint256 nodeAndPlatformAmount = _nodeAmount.add(_platformAmount);
+            stafiDistributor.distributeWithdrawals{value: nodeAndPlatformAmount}();
+
+            afterExecProposal(proposalId);
         }
-        proposals[proposalId] = proposal;
     }
 
     function notifyValidatorExit(
         uint256 _withdrawCycle,
         uint256 _ejectedStartCycle,
         uint256[] calldata _validatorIndexList
-    ) external override onlySubAccount {
+    ) external override onlyLatestContract("stafiWithdraw", address(this)) onlyTrustedNode(msg.sender) {
         bytes32 proposalId = keccak256(abi.encodePacked(_withdrawCycle, _ejectedStartCycle, _validatorIndexList));
-        Proposal memory proposal = voteProposal(proposalId);
+        bool needExe = voteProposal(proposalId);
 
         // Finalize if Threshold has been reached
-        if (proposal._yesVotesTotal >= threshold) {
+        if (needExe) {
             ejectedValidatorsAtCycle[_withdrawCycle] = _validatorIndexList;
             ejectedStartCyle = _ejectedStartCycle;
 
             emit NotifyValidatorExit(_withdrawCycle, _ejectedStartCycle, _validatorIndexList);
 
-            proposal._status = ProposalStatus.Executed;
-            emit ProposalExecuted(proposalId);
+            afterExecProposal(proposalId);
         }
-        proposals[proposalId] = proposal;
     }
 
-    // ------------ proposal ------------
-    function addSubAccount(address _subAccount) public onlyOwner {
-        subAccounts.add(_subAccount);
-    }
-
-    function removeSubAccount(address _subAccount) public onlyOwner {
-        subAccounts.remove(_subAccount);
-    }
-
-    function changeThreshold(uint256 _newThreshold) external onlyOwner {
-        require(subAccounts.length() >= _newThreshold && _newThreshold > 0, "invalid threshold");
-        threshold = _newThreshold.toUint8();
-    }
-
-    function getSubAccountIndex(address _subAccount) public view returns (uint256) {
-        return subAccounts._inner._indexes[bytes32(uint256(_subAccount))];
-    }
-
-    function subAccountBit(address _subAccount) private view returns (uint256) {
-        return uint256(1) << getSubAccountIndex(_subAccount).sub(1);
-    }
-
-    function _hasVoted(Proposal memory _proposal, address _subAccount) private view returns (bool) {
-        return (subAccountBit(_subAccount) & uint256(_proposal._yesVotes)) > 0;
-    }
-
-    function hasVoted(bytes32 _proposalId, address _subAccount) public view returns (bool) {
-        Proposal memory proposal = proposals[_proposalId];
-        return _hasVoted(proposal, _subAccount);
-    }
-
-    function voteProposal(bytes32 _proposalId) private view returns (Proposal memory) {
-        Proposal memory proposal = proposals[_proposalId];
-
-        require(uint256(proposal._status) <= 1, "proposal already executed");
-        require(!_hasVoted(proposal, msg.sender), "already voted");
-
-        if (proposal._status == ProposalStatus.Inactive) {
-            proposal = Proposal({_status: ProposalStatus.Active, _yesVotes: 0, _yesVotesTotal: 0});
-        }
-        proposal._yesVotes = (proposal._yesVotes | subAccountBit(msg.sender)).toUint16();
-        proposal._yesVotesTotal++;
-
-        return proposal;
-    }
-
-    function emergencyWithdraw() external onlyOwner {
-        (bool success, ) = msg.sender.call{value: address(this).balance}("");
-        require(success, "failed to withdraw");
+    // ------------ setting ------------
+    function setWithdrawCycleLimit(uint256 _withdrawCycleLimit) external onlySuperUser {
+        withdrawCycleLimit = _withdrawCycleLimit;
     }
 
     // ------------ helper ------------
@@ -336,5 +228,41 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
         ERC20Burnable(rEthAddress).burnFrom(msg.sender, _rEthAmount);
 
         return ethAmount;
+    }
+
+    function voteProposal(
+        bytes32 _proposalId
+    ) internal onlyLatestContract("stafiWithdraw", address(this)) onlyTrustedNode(msg.sender) returns (bool) {
+        // Get submission keys
+        bytes32 proposalNodeKey = keccak256(
+            abi.encodePacked("stafiWithdraw.proposal.node.key", _proposalId, msg.sender)
+        );
+        bytes32 proposalKey = keccak256(abi.encodePacked("stafiWithdraw.proposal.key", _proposalId));
+
+        require(!getBool(proposalKey), "proposal already executed");
+
+        // Check & update node submission status
+        require(!getBool(proposalNodeKey), "duplicate vote");
+        setBool(proposalNodeKey, true);
+
+        // Increment submission count
+        uint256 voteCount = getUint(proposalKey).add(1);
+        setUint(proposalKey, voteCount);
+
+        // Check submission count & update network balances
+        uint256 calcBase = 1 ether;
+        IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
+        IStafiNetworkSettings stafiNetworkSettings = IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
+        uint256 threshold = stafiNetworkSettings.getNodeConsensusThreshold();
+        if (calcBase.mul(voteCount) >= stafiNodeManager.getTrustedNodeCount().mul(threshold)) {
+            return true;
+        }
+        return false;
+    }
+
+    function afterExecProposal(bytes32 _proposalId) internal {
+        bytes32 proposalKey = keccak256(abi.encodePacked("stafiWithdraw.proposal.key", _proposalId));
+        setBool(proposalKey, true);
+        emit ProposalExecuted(_proposalId);
     }
 }
