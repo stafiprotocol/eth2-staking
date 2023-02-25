@@ -7,7 +7,6 @@ interface IStafiUserDeposit {
     function getExcessBalance() external view returns (uint256);
     function deposit() external payable;
     function recycleDissolvedDeposit() external payable;
-    function recycleWithdrawnDeposit() external payable;
     function recycleWithdrawDeposit() external payable;
     function recycleDistributorDeposit() external payable;
     function assignDeposits() external;

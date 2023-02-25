@@ -42,6 +42,10 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
 
     // ------------ events ------------
     event EtherDeposited(address indexed from, uint256 amount, uint256 time);
+    event Claim(address indexed from, uint256 amount, uint256 withdrawIndex);
+    event WithdrawInstantly(address indexed from, uint256 rethAmount, uint256 ethAmount, uint256 withdrawIndex);
+    event Withdraw(address indexed from, uint256 rethAmount, uint256 ethAmount, uint256 withdrawIndex);
+    event VoteProposal(bytes32 indexed proposalId, address voter);
     event ProposalExecuted(bytes32 indexed proposalId);
     event NotifyValidatorExit(uint256 withdrawCycle, uint256 ejectedStartWithdrawCycle, uint256[] ejectedValidators);
 
@@ -86,8 +90,10 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         claimedWithdrawalsOfUser[msg.sender].add(nextWithdrawIndex);
         nextWithdrawIndex = nextWithdrawIndex.add(1);
 
-        (bool result, ) = msg.sender.call{gas: 2300, value: ethAmount}("");
+        (bool result, ) = msg.sender.call{value: ethAmount}("");
         require(result, "Failed to withdraw ETH");
+
+        emit WithdrawInstantly(msg.sender, _rEthAmount, ethAmount, nextWithdrawIndex.sub(1));
     }
 
     function withdraw(uint256 _rEthAmount) external override onlyLatestContract("stafiWithdraw", address(this)) {
@@ -109,6 +115,8 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         withdrawalAtIndex[nextWithdrawIndex] = Withdrawal({_address: msg.sender, _amount: ethAmount, _claimed: false});
         unclaimedWithdrawalsOfUser[msg.sender].add(nextWithdrawIndex);
         nextWithdrawIndex = nextWithdrawIndex.add(1);
+
+        emit Withdraw(msg.sender, _rEthAmount, ethAmount, nextWithdrawIndex.sub(1));
     }
 
     function claim(
@@ -116,18 +124,21 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     ) external override onlyLatestContract("stafiWithdraw", address(this)) {
         uint256 totalAmount;
         for (uint256 i = 0; i < _withdrawIndexList.length; i++) {
-            require(_withdrawIndexList[i] <= maxClaimableWithdrawIndex, "not claimable");
-            require(!withdrawalAtIndex[_withdrawIndexList[i]]._claimed, "already claimed");
+            uint256 withdrawIndex = _withdrawIndexList[i];
+            require(withdrawIndex <= maxClaimableWithdrawIndex, "not claimable");
+            require(!withdrawalAtIndex[withdrawIndex]._claimed, "already claimed");
 
-            withdrawalAtIndex[_withdrawIndexList[i]]._claimed = true;
-            totalAmount = totalAmount.add(withdrawalAtIndex[_withdrawIndexList[i]]._amount);
+            withdrawalAtIndex[withdrawIndex]._claimed = true;
+            totalAmount = totalAmount.add(withdrawalAtIndex[withdrawIndex]._amount);
 
-            unclaimedWithdrawalsOfUser[msg.sender].remove(_withdrawIndexList[i]);
-            claimedWithdrawalsOfUser[msg.sender].add(_withdrawIndexList[i]);
+            unclaimedWithdrawalsOfUser[msg.sender].remove(withdrawIndex);
+            claimedWithdrawalsOfUser[msg.sender].add(withdrawIndex);
+
+            emit Claim(msg.sender, withdrawalAtIndex[withdrawIndex]._amount, withdrawIndex);
         }
 
         if (totalAmount > 0) {
-            (bool result, ) = msg.sender.call{gas: 2300, value: totalAmount}("");
+            (bool result, ) = msg.sender.call{value: totalAmount}("");
             require(result, "user failed to claim ETH");
         }
     }
@@ -139,7 +150,7 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         uint256 _nodeAmount,
         uint256 _platformAmount,
         uint256 _maxClaimableWithdrawIndex
-    ) external onlyLatestContract("stafiWithdraw", address(this)) onlyTrustedNode(msg.sender) {
+    ) external override onlyLatestContract("stafiWithdraw", address(this)) onlyTrustedNode(msg.sender) {
         require(_dealedHeight > latestDistributeHeight, "height already dealed");
         bytes32 proposalId = keccak256(
             abi.encodePacked(_dealedHeight, _userAmount, _nodeAmount, _platformAmount, _maxClaimableWithdrawIndex)
@@ -199,11 +210,11 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     }
 
     // ------------ getter ------------
-    function getUnclaimedWithdrawalsOfUser(address user) external view returns (uint256[] memory) {
+    function getUnclaimedWithdrawalsOfUser(address user) external view override returns (uint256[] memory) {
         return getWithdrawalsOfUser(unclaimedWithdrawalsOfUser[user]);
     }
 
-    function getClaimedWithdrawalsOfUser(address user) external view returns (uint256[] memory) {
+    function getClaimedWithdrawalsOfUser(address user) external view override returns (uint256[] memory) {
         return getWithdrawalsOfUser(claimedWithdrawalsOfUser[user]);
     }
 
@@ -267,6 +278,8 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         uint256 voteCount = getUint(proposalKey).add(1);
         setUint(proposalKey, voteCount);
 
+        emit VoteProposal(_proposalId, msg.sender);
+
         // Check submission count & update network balances
         uint256 calcBase = 1 ether;
         IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
@@ -281,6 +294,7 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     function afterExecProposal(bytes32 _proposalId) internal {
         bytes32 proposalKey = keccak256(abi.encodePacked("stafiWithdraw.proposal.key", _proposalId));
         setBool(proposalKey, true);
+
         emit ProposalExecuted(_proposalId);
     }
 }

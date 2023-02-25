@@ -88,14 +88,8 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         processDeposit();
     }
 
-    // Recycle a deposit from a withdrawn stakingPool
-    function recycleWithdrawnDeposit() override external payable onlyLatestContract("stafiUserDeposit", address(this)) onlyLatestContract("stafiNetworkWithdrawal", msg.sender) {
-        // Emit deposit recycled event
-        emit DepositRecycled(msg.sender, msg.value, block.timestamp);
-        // Process deposit
-        processDeposit();
-    }
     // Recycle a deposit from fee collector
+    // Only accepts calls from registered stafiDistributor
     function recycleDistributorDeposit() override external payable onlyLatestContract("stafiUserDeposit", address(this)) onlyLatestContract("stafiDistributor", msg.sender) {
         // Emit deposit recycled event
         emit DepositRecycled(msg.sender, msg.value, block.timestamp);
@@ -103,7 +97,8 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         processDeposit();
     }
     
-    // Recycle a deposit from fee collector
+    // Recycle a deposit from withdraw pool
+    // Only accepts calls from registered stafiWithdraw
     function recycleWithdrawDeposit() override external payable onlyLatestContract("stafiUserDeposit", address(this)) onlyLatestContract("stafiWithdraw", msg.sender) {
         // Emit deposit recycled event
         emit DepositRecycled(msg.sender, msg.value, block.timestamp);
@@ -124,7 +119,10 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
     // Assign deposits to available stakingPools
     function assignDeposits() override public onlyLatestContract("stafiUserDeposit", address(this)) {
         // Check deposit settings
-        require(getAssignDepositsEnabled(), "Deposit assignments are currently disabled");
+        if (!getAssignDepositsEnabled()) {
+            return;
+        }
+
         // Load contracts
         IStafiStakingPoolQueue stafiStakingPoolQueue = IStafiStakingPoolQueue(getContractAddress("stafiStakingPoolQueue"));
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));

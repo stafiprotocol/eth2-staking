@@ -17,5 +17,18 @@ interface IStafiWithdraw {
         uint256[] calldata _validatorIndex
     ) external;
 
+    // voter
+    function distributeWithdrawals(
+        uint256 _dealedHeight,
+        uint256 _userAmount,
+        uint256 _nodeAmount,
+        uint256 _platformAmount,
+        uint256 _maxClaimableWithdrawIndex
+    ) external;
+
     function depositEth() external payable;
+
+    function getUnclaimedWithdrawalsOfUser(address user) external view returns (uint256[] memory);
+
+    function getClaimedWithdrawalsOfUser(address user) external view returns (uint256[] memory);
 }
