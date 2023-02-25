@@ -106,7 +106,7 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
     }
 
     // ----- node claim --------------
-    function setMerkleRoot(bytes32 _merkleRoot) public onlyTrustedNode(msg.sender) {
+    function setMerkleRoot(bytes32 _merkleRoot) external onlyTrustedNode(msg.sender) {
         setBytes32(keccak256(abi.encodePacked("stafiDistributor.merkleRoot")), _merkleRoot);
     }
 

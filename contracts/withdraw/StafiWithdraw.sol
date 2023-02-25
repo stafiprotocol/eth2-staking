@@ -2,6 +2,7 @@ pragma solidity 0.7.6;
 // SPDX-License-Identifier: GPL-3.0-only
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 import "../StafiBase.sol";
 import "../interfaces/withdraw/IStafiWithdraw.sol";
@@ -17,6 +18,7 @@ import "../interfaces/deposit/IStafiUserDeposit.sol";
 // 2 the new storage needs to be appended to the old storage if this contract is upgraded,
 contract StafiWithdraw is StafiBase, IStafiWithdraw {
     using SafeMath for uint256;
+    using EnumerableSet for EnumerableSet.UintSet;
 
     struct Withdrawal {
         address _address;
@@ -32,7 +34,8 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     uint256 public withdrawCycleLimit;
 
     mapping(uint256 => Withdrawal) public withdrawalAtIndex;
-    mapping(address => uint256[]) public withdrawIndexListOfUser;
+    mapping(address => EnumerableSet.UintSet) internal unclaimedWithdrawalsOfUser;
+    mapping(address => EnumerableSet.UintSet) internal claimedWithdrawalsOfUser;
     mapping(uint256 => uint256) public totalWithdrawAmountAtCycle;
     mapping(address => mapping(uint256 => uint256)) public userWithdrawAmountAtCycle;
     mapping(uint256 => uint256[]) public ejectedValidatorsAtCycle;
@@ -80,6 +83,9 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         stafiUserDeposit.withdrawExcessBalanceForWithdraw(ethAmount);
 
         withdrawalAtIndex[nextWithdrawIndex] = Withdrawal({_address: msg.sender, _amount: ethAmount, _claimed: true});
+        claimedWithdrawalsOfUser[msg.sender].add(nextWithdrawIndex);
+        nextWithdrawIndex = nextWithdrawIndex.add(1);
+
         (bool result, ) = msg.sender.call{gas: 2300, value: ethAmount}("");
         require(result, "Failed to withdraw ETH");
     }
@@ -101,6 +107,8 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         }
 
         withdrawalAtIndex[nextWithdrawIndex] = Withdrawal({_address: msg.sender, _amount: ethAmount, _claimed: false});
+        unclaimedWithdrawalsOfUser[msg.sender].add(nextWithdrawIndex);
+        nextWithdrawIndex = nextWithdrawIndex.add(1);
     }
 
     function claim(
@@ -113,7 +121,11 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
 
             withdrawalAtIndex[_withdrawIndexList[i]]._claimed = true;
             totalAmount = totalAmount.add(withdrawalAtIndex[_withdrawIndexList[i]]._amount);
+
+            unclaimedWithdrawalsOfUser[msg.sender].remove(_withdrawIndexList[i]);
+            claimedWithdrawalsOfUser[msg.sender].add(_withdrawIndexList[i]);
         }
+
         if (totalAmount > 0) {
             (bool result, ) = msg.sender.call{gas: 2300, value: totalAmount}("");
             require(result, "user failed to claim ETH");
@@ -186,8 +198,27 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         withdrawCycleLimit = _withdrawCycleLimit;
     }
 
-    // ------------ helper ------------
+    // ------------ getter ------------
+    function getUnclaimedWithdrawalsOfUser(address user) external view returns (uint256[] memory) {
+        return getWithdrawalsOfUser(unclaimedWithdrawalsOfUser[user]);
+    }
 
+    function getClaimedWithdrawalsOfUser(address user) external view returns (uint256[] memory) {
+        return getWithdrawalsOfUser(claimedWithdrawalsOfUser[user]);
+    }
+
+    function getWithdrawalsOfUser(
+        EnumerableSet.UintSet storage withdrawalsSet
+    ) internal view returns (uint256[] memory) {
+        uint256 length = withdrawalsSet.length();
+        uint256[] memory withdrawals = new uint256[](length);
+        for (uint256 i = 0; i < length; i++) {
+            withdrawals[i] = (withdrawalsSet.at(i));
+        }
+        return withdrawals;
+    }
+
+    // ------------ helper ------------
     function currentWithdrawCycle() public view returns (uint256) {
         return block.timestamp.sub(28800).div(86400);
     }
@@ -211,9 +242,6 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         userWithdrawAmountAtCycle[msg.sender][currentCycle] = userWithdrawAmountAtCycle[msg.sender][currentCycle].add(
             ethAmount
         );
-
-        withdrawIndexListOfUser[msg.sender].push(nextWithdrawIndex);
-        nextWithdrawIndex = nextWithdrawIndex.add(1);
 
         ERC20Burnable(rEthAddress).burnFrom(msg.sender, _rEthAmount);
 
