@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 import "../StafiBase.sol";
 import "../interfaces/withdraw/IStafiWithdraw.sol";
 import "../interfaces/storage/IStafiStorage.sol";
-import "../interfaces/IStafiEtherWithdrawer.sol";
 import "../interfaces/token/IRETHToken.sol";
 import "../interfaces/settings/IStafiNetworkSettings.sol";
 import "../interfaces/node/IStafiNodeManager.sol";
@@ -16,7 +15,7 @@ import "../interfaces/deposit/IStafiUserDeposit.sol";
 // Notice:
 // 1 proxy admin must be different from owner
 // 2 the new storage needs to be appended to the old storage if this contract is upgraded,
-contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
+contract StafiWithdraw is StafiBase, IStafiWithdraw {
     using SafeMath for uint256;
 
     struct Withdrawal {
@@ -61,15 +60,6 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw, IStafiEtherWithdrawer {
 
     // Receive eth
     receive() external payable {}
-
-    // Receive a ether withdrawal, only accepts calls from the StafiEther contract
-    function receiveEtherWithdrawal()
-        external
-        payable
-        override
-        onlyLatestContract("stafiDistributor", address(this))
-        onlyLatestContract("stafiEther", msg.sender)
-    {}
 
     // Deposit ETH from deposit pool
     // Only accepts calls from the StafiUserDeposit contract

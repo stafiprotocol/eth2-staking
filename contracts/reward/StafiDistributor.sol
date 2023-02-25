@@ -116,16 +116,16 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         uint256 _totalAmount,
         bytes32[] calldata _merkleProof
     ) external onlyLatestContract("stafiDistributor", address(this)) {
-        uint256 totalClaimed = getUint(keccak256(abi.encodePacked("stafiDistributor.user.totalClaimed", _account)));
+        uint256 totalClaimed = getUint(keccak256(abi.encodePacked("stafiDistributor.node.totalClaimed", _account)));
         require(_totalAmount > totalClaimed, "claimable amount zero");
-        bytes32 merkleRoot = getBytes32(keccak256(abi.encodePacked("rewards.claimed.merkleRoot")));
+        bytes32 merkleRoot = getBytes32(keccak256(abi.encodePacked("stafiDistributor.merkleRoot")));
 
         // Verify the merkle proof.
         bytes32 node = keccak256(abi.encodePacked(_index, _account, _totalAmount));
         require(MerkleProof.verify(_merkleProof, merkleRoot, node), "invalid proof");
 
         // Mark it claimed and send the token.
-        setUint(keccak256(abi.encodePacked("stafiDistributor.user.totalClaimed", _account)), _totalAmount);
+        setUint(keccak256(abi.encodePacked("stafiDistributor.node.totalClaimed", _account)), _totalAmount);
 
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
         uint256 willClaimAmount = _totalAmount.sub(totalClaimed);
