@@ -6,7 +6,7 @@
   "scripts": {
     "compile": "npx hardhat compile",
     "size": "npx hardhat size-contracts",
-    "test": "npx hardhat test",
+    "test": "npx hardhat test ./test/StafiDeposit.test.js",
     "clean": "rm -rf ./node_modules"
   },
   "author": "Stafi Technologies",

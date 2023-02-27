@@ -3,6 +3,7 @@ pragma abicoder v2;
 
 // SPDX-License-Identifier: GPL-3.0-only
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/cryptography/MerkleProof.sol";
 import "../StafiBase.sol";
 import "../interfaces/IStafiEther.sol";
 import "../interfaces/deposit/IStafiUserDeposit.sol";
@@ -11,7 +12,7 @@ import "../interfaces/reward/IStafiFeePool.sol";
 import "../interfaces/reward/IStafiSuperNodeFeePool.sol";
 import "../interfaces/reward/IStafiDistributor.sol";
 import "../interfaces/IStafiEtherWithdrawer.sol";
-import "@openzeppelin/contracts/cryptography/MerkleProof.sol";
+import "../interfaces/node/IStafiNodeManager.sol";
 
 // Handles network validator priority fees
 contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor {
@@ -19,6 +20,8 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
     using SafeMath for uint256;
 
     event Claimed(uint256 index, address account, uint256 claimedAmount, uint256 totalAmount);
+    event VoteProposal(bytes32 indexed proposalId, address voter);
+    event ProposalExecuted(bytes32 indexed proposalId);
 
     // Construct
     constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
@@ -106,8 +109,22 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
     }
 
     // ----- node claim --------------
-    function setMerkleRoot(bytes32 _merkleRoot) external onlyTrustedNode(msg.sender) {
-        setBytes32(keccak256(abi.encodePacked("stafiDistributor.merkleRoot")), _merkleRoot);
+    function setMerkleRoot(
+        uint256 _dealedHeight,
+        bytes32 _merkleRoot
+    ) external onlyLatestContract("stafiDistributor", address(this)) onlyTrustedNode(msg.sender) {
+        uint256 preDealedHeight = getUint(keccak256(abi.encodePacked("stafiDistributor.merkleRoot.dealedHeight")));
+        require(_dealedHeight > preDealedHeight, "height already dealed");
+
+        bytes32 proposalId = keccak256(abi.encodePacked(_dealedHeight, _merkleRoot));
+        bool needExe = voteProposal(proposalId);
+
+        // Finalize if Threshold has been reached
+        if (needExe) {
+            setBytes32(keccak256(abi.encodePacked("stafiDistributor.merkleRoot")), _merkleRoot);
+            setUint(keccak256(abi.encodePacked("stafiDistributor.merkleRoot.dealedHeight")), _dealedHeight);
+            afterExecProposal(proposalId);
+        }
     }
 
     function claim(
@@ -134,5 +151,44 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         require(success, "failed to claim ETH");
 
         emit Claimed(_index, _account, willClaimAmount, _totalAmount);
+    }
+
+    function voteProposal(
+        bytes32 _proposalId
+    ) internal onlyLatestContract("stafiDistributor", address(this)) onlyTrustedNode(msg.sender) returns (bool) {
+        // Get submission keys
+        bytes32 proposalNodeKey = keccak256(
+            abi.encodePacked("stafiDistributor.proposal.node.key", _proposalId, msg.sender)
+        );
+        bytes32 proposalKey = keccak256(abi.encodePacked("stafiDistributor.proposal.key", _proposalId));
+
+        require(!getBool(proposalKey), "proposal already executed");
+
+        // Check & update node submission status
+        require(!getBool(proposalNodeKey), "duplicate vote");
+        setBool(proposalNodeKey, true);
+
+        // Increment submission count
+        uint256 voteCount = getUint(proposalKey).add(1);
+        setUint(proposalKey, voteCount);
+
+        emit VoteProposal(_proposalId, msg.sender);
+
+        // Check submission count & update network balances
+        uint256 calcBase = 1 ether;
+        IStafiNodeManager stafiNodeManager = IStafiNodeManager(getContractAddress("stafiNodeManager"));
+        IStafiNetworkSettings stafiNetworkSettings = IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
+        uint256 threshold = stafiNetworkSettings.getNodeConsensusThreshold();
+        if (calcBase.mul(voteCount) >= stafiNodeManager.getTrustedNodeCount().mul(threshold)) {
+            return true;
+        }
+        return false;
+    }
+
+    function afterExecProposal(bytes32 _proposalId) internal {
+        bytes32 proposalKey = keccak256(abi.encodePacked("stafiDistributor.proposal.key", _proposalId));
+        setBool(proposalKey, true);
+
+        emit ProposalExecuted(_proposalId);
     }
 }

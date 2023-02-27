@@ -35,7 +35,6 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
 
     mapping(uint256 => Withdrawal) public withdrawalAtIndex;
     mapping(address => EnumerableSet.UintSet) internal unclaimedWithdrawalsOfUser;
-    mapping(address => EnumerableSet.UintSet) internal claimedWithdrawalsOfUser;
     mapping(uint256 => uint256) public totalWithdrawAmountAtCycle;
     mapping(address => mapping(uint256 => uint256)) public userWithdrawAmountAtCycle;
     mapping(uint256 => uint256[]) public ejectedValidatorsAtCycle;
@@ -87,7 +86,6 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         stafiUserDeposit.withdrawExcessBalanceForWithdraw(ethAmount);
 
         withdrawalAtIndex[nextWithdrawIndex] = Withdrawal({_address: msg.sender, _amount: ethAmount, _claimed: true});
-        claimedWithdrawalsOfUser[msg.sender].add(nextWithdrawIndex);
         nextWithdrawIndex = nextWithdrawIndex.add(1);
 
         (bool result, ) = msg.sender.call{value: ethAmount}("");
@@ -132,7 +130,6 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
             totalAmount = totalAmount.add(withdrawalAtIndex[withdrawIndex]._amount);
 
             unclaimedWithdrawalsOfUser[msg.sender].remove(withdrawIndex);
-            claimedWithdrawalsOfUser[msg.sender].add(withdrawIndex);
 
             emit Claim(msg.sender, withdrawalAtIndex[withdrawIndex]._amount, withdrawIndex);
         }
@@ -212,10 +209,6 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     // ------------ getter ------------
     function getUnclaimedWithdrawalsOfUser(address user) external view override returns (uint256[] memory) {
         return getWithdrawalsOfUser(unclaimedWithdrawalsOfUser[user]);
-    }
-
-    function getClaimedWithdrawalsOfUser(address user) external view override returns (uint256[] memory) {
-        return getWithdrawalsOfUser(claimedWithdrawalsOfUser[user]);
     }
 
     function getWithdrawalsOfUser(

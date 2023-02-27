@@ -19,6 +19,7 @@ describe("StafiDeposit test", function () {
         this.AccountSuperNode1 = this.signers[6]
         this.AccountNode2 = this.signers[7]
         this.AccountNode3 = this.signers[8]
+        this.AccountProxyAdmin = this.signers[9]
 
 
 
@@ -26,7 +27,6 @@ describe("StafiDeposit test", function () {
         this.FactoryStafiUserDeposit = await ethers.getContractFactory("StafiUserDeposit", this.AccountAdmin)
 
         this.FactoryStafiNetworkBalances = await ethers.getContractFactory("StafiNetworkBalances", this.AccountAdmin)
-        this.FactoryStafiNetworkWithdrawal = await ethers.getContractFactory("StafiNetworkWithdrawal", this.AccountAdmin)
         this.FactoryStafiDistributor = await ethers.getContractFactory("StafiDistributor", this.AccountAdmin)
         this.FactoryStafiFeePool = await ethers.getContractFactory("StafiFeePool", this.AccountAdmin)
         this.FactoryStafiSuperNodeFeePool = await ethers.getContractFactory("StafiSuperNodeFeePool", this.AccountAdmin)
@@ -54,6 +54,9 @@ describe("StafiDeposit test", function () {
 
         this.FactoryStafiEther = await ethers.getContractFactory("StafiEther", this.AccountAdmin)
         this.FactoryStafiUpgrade = await ethers.getContractFactory("StafiUpgrade", this.AccountAdmin)
+
+        this.FactoryStafiWithdraw = await ethers.getContractFactory("StafiWithdraw", this.AccountAdmin)
+        this.FactoryStafiWithdrawProxy = await ethers.getContractFactory("StafiWithdrawProxy", this.AccountAdmin)
     })
 
     beforeEach(async function () {
@@ -152,11 +155,6 @@ describe("StafiDeposit test", function () {
         console.log("contract stafiNetworkBalances address: ", this.ContractStafiNetworkBalances.address)
         await this.ContractStafiUpgrade.addContract("stafiNetworkBalances", this.ContractStafiNetworkBalances.address)
 
-        this.ContractStafiNetworkWithdrawal = await this.FactoryStafiNetworkWithdrawal.deploy(this.ContractStafiStorage.address)
-        await this.ContractStafiNetworkWithdrawal.deployed()
-        console.log("contract stafiNetworkWithdrawal address: ", this.ContractStafiNetworkWithdrawal.address)
-        await this.ContractStafiUpgrade.addContract("stafiNetworkWithdrawal", this.ContractStafiNetworkWithdrawal.address)
-
         this.ContractStafiDistributor = await this.FactoryStafiDistributor.deploy(this.ContractStafiStorage.address)
         await this.ContractStafiDistributor.deployed()
         console.log("contract stafi distributor address: ", this.ContractStafiDistributor.address)
@@ -183,6 +181,18 @@ describe("StafiDeposit test", function () {
         await this.ContractStafiUserDeposit.deployed()
         console.log("contract stafiUserDeposit address: ", this.ContractStafiUserDeposit.address)
         await this.ContractStafiUpgrade.addContract("stafiUserDeposit", this.ContractStafiUserDeposit.address)
+
+        contractStafiWithdraw = await this.FactoryStafiWithdraw.deploy()
+        await contractStafiWithdraw.deployed()
+        console.log("contract stafiWithdraw address: ", contractStafiWithdraw.address)
+
+        this.ContractStafiWithdrawProxy = await this.FactoryStafiWithdrawProxy.deploy(contractStafiWithdraw.address, this.AccountProxyAdmin.address, [])
+        await this.ContractStafiWithdrawProxy.deployed()
+        console.log("contract stafiWithdrawProxy address: ", this.ContractStafiWithdrawProxy.address)
+        await this.ContractStafiUpgrade.addContract("stafiWithdraw", this.ContractStafiWithdrawProxy.address)
+
+        this.ContractStafiWithdraw = await ethers.getContractAt("StafiWithdraw", this.ContractStafiWithdrawProxy.address)
+        await this.ContractStafiWithdraw.initialize(this.ContractStafiStorage.address, web3.utils.toWei('5', 'ether'))
 
 
 
@@ -523,31 +533,47 @@ describe("StafiDeposit test", function () {
         console.log("root: ", tree.getHexRoot());
 
         // set merkle root
-        let setMerkleRootTx = await this.ContractStafiDistributor.connect(this.AccountAdmin).setMerkleRoot(0, tree.getHexRoot(), { from: this.AccountAdmin.address })
+        let setMerkleRootTx = await this.ContractStafiDistributor.connect(this.AccountTrustNode1).setMerkleRoot(1, tree.getHexRoot(), { from: this.AccountTrustNode1.address })
         let setMerkleRootTxRecepient = await setMerkleRootTx.wait()
         console.log("setMerkleRoot  tx gas: ", setMerkleRootTxRecepient.gasUsed.toString())
 
         let proof = tree.getProof(0, this.AccountNode1.address, web3.utils.toWei("1", "ether"))
         let proof2 = tree.getProof(1, this.AccountNode2.address, web3.utils.toWei("2", "ether"))
 
-        expect((await this.ContractStafiDistributor.isClaimed(0, 0))).to.equal(false);
-        expect((await this.ContractStafiDistributor.isClaimed(0, 1))).to.equal(false);
         let node1Balance = await ethers.provider.getBalance(this.AccountNode1.address)
         let node2Balance = await ethers.provider.getBalance(this.AccountNode2.address)
 
         // claim
-        let claimTx = await this.ContractStafiDistributor.connect(this.AccountUser1).claim([0, 0], [0, 1], [this.AccountNode1.address, this.AccountNode2.address],
-            [web3.utils.toWei("1", "ether"), web3.utils.toWei("2", "ether")], [proof, proof2], { from: this.AccountUser1.address })
+        let claimTx = await this.ContractStafiDistributor.connect(this.AccountUser1).claim(0, this.AccountNode1.address,
+            web3.utils.toWei("1", "ether"), proof, { from: this.AccountUser1.address })
         let claimTxRecepient = await claimTx.wait()
         console.log("claim tx gas: ", claimTxRecepient.gasUsed.toString())
 
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("7.76375", "ether"));
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("9.76375", "ether"));
         expect((await ethers.provider.getBalance(this.AccountNode1.address)).sub(node1Balance).toString()).to.equal(web3.utils.toWei("1", "ether"));
-        expect((await ethers.provider.getBalance(this.AccountNode2.address)).sub(node2Balance).toString()).to.equal(web3.utils.toWei("2", "ether"));
 
-        expect((await this.ContractStafiDistributor.isClaimed(0, 0))).to.equal(true);
-        expect((await this.ContractStafiDistributor.isClaimed(0, 1))).to.equal(true);
-        expect((await this.ContractStafiDistributor.isClaimed(0, 2))).to.equal(false);
     })
 
+    it("user withdrawInstantly/withdraw/claim should success", async function () {
+        // enable deposit
+        await this.ContractStafiLightNode.connect(this.AccountAdmin).setLightNodeDepositEnabled(true)
+        // user deposit
+        let userDepositTx = await this.ContractStafiUserDeposit.connect(this.AccountUser1).deposit({ from: this.AccountUser1.address, value: web3.utils.toWei('68', 'ether') })
+        let userDepositTxRecipient = await userDepositTx.wait()
+        console.log("user deposit tx gas: ", userDepositTxRecipient.gasUsed.toString())
+
+        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("68", 'ether'))
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
+        expect((await this.ContractRETHToken.balanceOf(this.AccountUser1.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
+
+        (await this.ContractRETHToken.connect(this.AccountUser1).approve(this.ContractStafiWithdraw.address, web3.utils.toWei("68", 'ether'))).wait()
+
+        let withdrawInstantlyTx = await this.ContractStafiWithdraw.connect(this.AccountUser1).withdrawInstantly(web3.utils.toWei('1', 'ether'), { from: this.AccountUser1.address })
+        let withdrawInstantly = await withdrawInstantlyTx.wait()
+        console.log("user withdrawInstantly tx gas: ", withdrawInstantly.gasUsed.toString())
+
+        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("67", 'ether'))
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("67", "ether"));
+        expect((await this.ContractRETHToken.balanceOf(this.AccountUser1.address)).toString()).to.equal(web3.utils.toWei("67", "ether"));
+    })
 })
