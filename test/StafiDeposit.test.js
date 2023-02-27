@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 const { ethers, web3 } = require("hardhat")
 const { expect } = require("chai")
-const { time, beacon } = require("./utilities")
+const { time, beacon, testing } = require("./utilities")
 var balance_tree_1 = __importDefault(require("./src/balance-tree"));
 
 describe("StafiDeposit test", function () {
@@ -192,7 +192,7 @@ describe("StafiDeposit test", function () {
         await this.ContractStafiUpgrade.addContract("stafiWithdraw", this.ContractStafiWithdrawProxy.address)
 
         this.ContractStafiWithdraw = await ethers.getContractAt("StafiWithdraw", this.ContractStafiWithdrawProxy.address)
-        await this.ContractStafiWithdraw.initialize(this.ContractStafiStorage.address, web3.utils.toWei('5', 'ether'))
+        await this.ContractStafiWithdraw.initialize(this.ContractStafiStorage.address, web3.utils.toWei('6', 'ether'), web3.utils.toWei('3', 'ether'))
 
 
 
@@ -575,5 +575,35 @@ describe("StafiDeposit test", function () {
         expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("67", 'ether'))
         expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("67", "ether"));
         expect((await this.ContractRETHToken.balanceOf(this.AccountUser1.address)).toString()).to.equal(web3.utils.toWei("67", "ether"));
+    })
+
+    it("user withdrawInstantly/withdraw/claim should fail", async function () {
+        // enable deposit
+        await this.ContractStafiLightNode.connect(this.AccountAdmin).setLightNodeDepositEnabled(true)
+        // user deposit
+        let userDepositTx = await this.ContractStafiUserDeposit.connect(this.AccountUser1).deposit({ from: this.AccountUser1.address, value: web3.utils.toWei('68', 'ether') })
+        let userDepositTxRecipient = await userDepositTx.wait()
+        console.log("user deposit tx gas: ", userDepositTxRecipient.gasUsed.toString())
+
+        expect((await this.ContractStafiWithdraw.withdrawLimitPerCycle()).toString()).to.equal(web3.utils.toWei("6", 'ether'))
+        expect((await this.ContractStafiWithdraw.userWithdrawLimitPerCycle()).toString()).to.equal(web3.utils.toWei("3", 'ether'))
+
+        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("68", 'ether'))
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
+        expect((await this.ContractRETHToken.balanceOf(this.AccountUser1.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
+
+        (await this.ContractRETHToken.connect(this.AccountUser1).approve(this.ContractStafiWithdraw.address, web3.utils.toWei("68", 'ether'))).wait()
+
+        let withdrawInstantlyTx = this.ContractStafiWithdraw.connect(this.AccountUser1).withdrawInstantly(web3.utils.toWei('7', 'ether'), { from: this.AccountUser1.address })
+        await testing.shouldRevert(withdrawInstantlyTx, "reach cycle limit revert", "reach cycle limit")
+
+        let withdrawInstantlyTx2 =  this.ContractStafiWithdraw.connect(this.AccountUser1).withdrawInstantly(web3.utils.toWei('4', 'ether'), { from: this.AccountUser1.address })
+        await testing.shouldRevert(withdrawInstantlyTx2, "reach user limit revert", "reach user limit")
+
+        expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("68", 'ether'))
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
+        expect((await this.ContractRETHToken.balanceOf(this.AccountUser1.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
+
+
     })
 })

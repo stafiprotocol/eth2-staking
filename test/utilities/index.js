@@ -31,4 +31,5 @@ module.exports = {
   time: require("./time"),
   ADDRESS_ZERO,
   beacon: require("./beacon"),
+  testing: require("./testing"),
 }

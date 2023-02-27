@@ -31,7 +31,8 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     uint256 public ejectedStartCyle;
     uint256 public latestDistributeHeight;
     uint256 public totalMissingAmountForWithdraw;
-    uint256 public withdrawCycleLimit;
+    uint256 public withdrawLimitPerCycle;
+    uint256 public userWithdrawLimitPerCycle;
 
     mapping(uint256 => Withdrawal) public withdrawalAtIndex;
     mapping(address => EnumerableSet.UintSet) internal unclaimedWithdrawalsOfUser;
@@ -55,13 +56,18 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         version = 1;
     }
 
-    function initialize(address _stafiStorageAddress, uint256 _withdrawCycleLimit) external {
+    function initialize(
+        address _stafiStorageAddress,
+        uint256 _withdrawLimitPerCycle,
+        uint256 _userWithdrawLimitPerCycle
+    ) external {
         require(version == 0, "already initizlized");
         // init StafiBase storage
         version = 1;
         stafiStorage = IStafiStorage(_stafiStorageAddress);
         // init StafiWithdraw storage
-        withdrawCycleLimit = _withdrawCycleLimit;
+        withdrawLimitPerCycle = _withdrawLimitPerCycle;
+        userWithdrawLimitPerCycle = _userWithdrawLimitPerCycle;
     }
 
     // Receive eth
@@ -202,22 +208,20 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     }
 
     // ------------ setting ------------
-    function setWithdrawCycleLimit(uint256 _withdrawCycleLimit) external onlySuperUser {
-        withdrawCycleLimit = _withdrawCycleLimit;
+    function setWithdrawLimitPerCycle(uint256 _withdrawLimitPerCycle) external onlySuperUser {
+        withdrawLimitPerCycle = _withdrawLimitPerCycle;
+    }
+
+    function setUserWithdrawLimitPerCycle(uint256 _userWithdrawLimitPerCycle) external onlySuperUser {
+        userWithdrawLimitPerCycle = _userWithdrawLimitPerCycle;
     }
 
     // ------------ getter ------------
     function getUnclaimedWithdrawalsOfUser(address user) external view override returns (uint256[] memory) {
-        return getWithdrawalsOfUser(unclaimedWithdrawalsOfUser[user]);
-    }
-
-    function getWithdrawalsOfUser(
-        EnumerableSet.UintSet storage withdrawalsSet
-    ) internal view returns (uint256[] memory) {
-        uint256 length = withdrawalsSet.length();
+        uint256 length = unclaimedWithdrawalsOfUser[user].length();
         uint256[] memory withdrawals = new uint256[](length);
         for (uint256 i = 0; i < length; i++) {
-            withdrawals[i] = (withdrawalsSet.at(i));
+            withdrawals[i] = (unclaimedWithdrawalsOfUser[user].at(i));
         }
         return withdrawals;
     }
@@ -236,9 +240,9 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         address rEthAddress = getContractAddress("rETHToken");
         uint256 ethAmount = IRETHToken(rEthAddress).getEthValue(_rEthAmount);
         uint256 currentCycle = currentWithdrawCycle();
-        require(totalWithdrawAmountAtCycle[currentCycle].add(ethAmount) <= withdrawCycleLimit, "reach cycle limit");
+        require(totalWithdrawAmountAtCycle[currentCycle].add(ethAmount) <= withdrawLimitPerCycle, "reach cycle limit");
         require(
-            userWithdrawAmountAtCycle[msg.sender][currentCycle].add(ethAmount) <= withdrawCycleLimit.div(2),
+            userWithdrawAmountAtCycle[msg.sender][currentCycle].add(ethAmount) <= userWithdrawLimitPerCycle,
             "reach user limit"
         );
 
