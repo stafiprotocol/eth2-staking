@@ -23,7 +23,6 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     struct Withdrawal {
         address _address;
         uint256 _amount;
-        bool _claimed;
     }
 
     uint256 public nextWithdrawIndex;
@@ -91,7 +90,7 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         require(ethAmount <= stakePoolBalance, "stake pool balance not enough");
         stafiUserDeposit.withdrawExcessBalanceForWithdraw(ethAmount);
 
-        withdrawalAtIndex[nextWithdrawIndex] = Withdrawal({_address: msg.sender, _amount: ethAmount, _claimed: true});
+        withdrawalAtIndex[nextWithdrawIndex] = Withdrawal({_address: msg.sender, _amount: ethAmount});
         nextWithdrawIndex = nextWithdrawIndex.add(1);
 
         (bool result, ) = msg.sender.call{value: ethAmount}("");
@@ -106,17 +105,18 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         uint256 stakePoolBalance = stafiUserDeposit.getBalance();
 
         if (stakePoolBalance > 0) {
-            uint256 mvAmount = ethAmount;
-            if (stakePoolBalance < ethAmount) {
+            uint256 mvAmount = totalMissingAmountForWithdraw.add(ethAmount);
+            if (stakePoolBalance < totalMissingAmountForWithdraw) {
                 mvAmount = stakePoolBalance;
-                totalMissingAmountForWithdraw = totalMissingAmountForWithdraw.add(ethAmount.sub(stakePoolBalance));
             }
             stafiUserDeposit.withdrawExcessBalanceForWithdraw(mvAmount);
+
+            totalMissingAmountForWithdraw = totalMissingAmountForWithdraw.add(ethAmount).sub(mvAmount);
         } else {
             totalMissingAmountForWithdraw = totalMissingAmountForWithdraw.add(ethAmount);
         }
 
-        withdrawalAtIndex[nextWithdrawIndex] = Withdrawal({_address: msg.sender, _amount: ethAmount, _claimed: false});
+        withdrawalAtIndex[nextWithdrawIndex] = Withdrawal({_address: msg.sender, _amount: ethAmount});
         unclaimedWithdrawalsOfUser[msg.sender].add(nextWithdrawIndex);
         nextWithdrawIndex = nextWithdrawIndex.add(1);
 
@@ -130,13 +130,9 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         for (uint256 i = 0; i < _withdrawIndexList.length; i++) {
             uint256 withdrawIndex = _withdrawIndexList[i];
             require(withdrawIndex <= maxClaimableWithdrawIndex, "not claimable");
-            require(!withdrawalAtIndex[withdrawIndex]._claimed, "already claimed");
+            require(unclaimedWithdrawalsOfUser[msg.sender].remove(withdrawIndex), "already claimed");
 
-            withdrawalAtIndex[withdrawIndex]._claimed = true;
             totalAmount = totalAmount.add(withdrawalAtIndex[withdrawIndex]._amount);
-
-            unclaimedWithdrawalsOfUser[msg.sender].remove(withdrawIndex);
-
             emit Claim(msg.sender, withdrawalAtIndex[withdrawIndex]._amount, withdrawIndex);
         }
 
