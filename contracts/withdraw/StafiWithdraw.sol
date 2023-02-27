@@ -189,6 +189,8 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         uint256 _ejectedStartCycle,
         uint256[] calldata _validatorIndexList
     ) external override onlyLatestContract("stafiWithdraw", address(this)) onlyTrustedNode(msg.sender) {
+        require(_ejectedStartCycle < _withdrawCycle && _withdrawCycle < currentWithdrawCycle(), "cycle not match");
+
         bytes32 proposalId = keccak256(abi.encodePacked(_withdrawCycle, _ejectedStartCycle, _validatorIndexList));
         bool needExe = voteProposal(proposalId);
 
@@ -203,7 +205,7 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         }
     }
 
-    // ------------ setting ------------
+    // ------------ settings ------------
     function setWithdrawLimitPerCycle(uint256 _withdrawLimitPerCycle) external onlySuperUser {
         withdrawLimitPerCycle = _withdrawLimitPerCycle;
     }
@@ -220,6 +222,10 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
             withdrawals[i] = (unclaimedWithdrawalsOfUser[user].at(i));
         }
         return withdrawals;
+    }
+
+    function getEjectedValidatorsAtCycle(uint256 cycle) external view override returns (uint256[] memory) {
+        return ejectedValidatorsAtCycle[cycle];
     }
 
     // ------------ helper ------------

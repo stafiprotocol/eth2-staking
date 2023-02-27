@@ -14,15 +14,11 @@ The illiquidity of staked ETH may deter user participation and calls for an imme
 - For a specific staker, whenever he stakes ETH to the SC, she will automatically receive a certain amount of rETH Tokens (ERC20 version) in return, which is a synthetic representation of her staked ETH balance and corresponding staking rewards. The rETH token may then be traded on a variety of trading venues, and can be used in other DeFi protocols.
 - For validators, StaFi will initiate a Liquidity Program, through which they could also sell part of their ETH staked in the SC back to StaFi. Relevant details are specified in the Original Validator portion.
 
-# Dependencies
-
-Requires `nodejs` and `npm`.
-
 # Compile
 
 ```
-npm install
-npm run compile
+yarn
+yarn compile
 ```
 
 # Test
@@ -30,25 +26,25 @@ npm run compile
 ```
 export ALCHEMY_API_KEY=xxxxxxxxxxxxxxxxxx
 
-npm run test
+yarn test
 ```
 
 # Show contract size
 
 ```
-npm run size
+yarn size
 ```
 
 # deploy
 
 ```
-npx hardhat run deploy_test.js --network xxxxx
+yarn hardhat run deploy_test.js --network xxxxx
 ```
 
 # verify in etherscan
 
 ```
-npx hardhat verify --network mainnet DEPLOYED_CONTRACT_ADDRESS "Constructor argument 1"
+yarn hardhat verify --network mainnet DEPLOYED_CONTRACT_ADDRESS "Constructor argument 1"
 ```
 
 # Credits

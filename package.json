@@ -4,10 +4,10 @@
   "description": "Ethereum 2.0 liquid staking",
   "repository": "https://github.com/stafiprotocol/eth2-staking",
   "scripts": {
-    "compile": "npx hardhat compile",
-    "size": "npx hardhat size-contracts",
-    "test": "npx hardhat test ./test/StafiDeposit.test.js",
-    "clean": "rm -rf ./node_modules"
+    "compile": "hardhat compile",
+    "size": "hardhat size-contracts",
+    "test": "hardhat test ./test/StafiDeposit.test.js",
+    "clean": "rm -rf ./node_modules ./artifacts ./cache"
   },
   "author": "Stafi Technologies",
   "license": "GPL-3.0-only",

@@ -654,7 +654,23 @@ describe("StafiDeposit test", function () {
         expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("68", 'ether'))
         expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
         expect((await this.ContractRETHToken.balanceOf(this.AccountUser1.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
+    })
 
+    it("notifyValidatorExit should success", async function () {
+        // notifyValidatorExit
+        let notifyExitTx = await this.ContractStafiWithdraw.connect(this.AccountTrustNode1).notifyValidatorExit(
+            BigInt(36), BigInt(30), [BigInt(6), BigInt(7)])
+        let notifyExit = await notifyExitTx.wait()
+        console.log("notifyExit tx gas: ", notifyExit.gasUsed.toString())
+
+
+        expect((await this.ContractStafiWithdraw.getEjectedValidatorsAtCycle(BigInt(35))).length.toString()).to.equal("0")
+        expect((await this.ContractStafiWithdraw.getEjectedValidatorsAtCycle(36)).length.toString()).to.equal("2")
+        expect((await this.ContractStafiWithdraw.getEjectedValidatorsAtCycle(36))[0].toString()).to.equal("6")
+        expect((await this.ContractStafiWithdraw.getEjectedValidatorsAtCycle(36))[1].toString()).to.equal("7")
+        expect((await this.ContractStafiWithdraw.ejectedStartCyle()).toString()).to.equal("30")
+
+        console.log((await this.ContractStafiWithdraw.currentWithdrawCycle()))
 
     })
 })
