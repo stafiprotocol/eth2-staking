@@ -1,5 +1,4 @@
 pragma solidity 0.7.6;
-pragma abicoder v2;
 
 // SPDX-License-Identifier: GPL-3.0-only
 import "@openzeppelin/contracts/math/SafeMath.sol";
@@ -49,24 +48,13 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         require(amount > 0, "zero amount");
 
         IStafiFeePool feePool = IStafiFeePool(getContractAddress("stafiFeePool"));
-        IStafiNetworkSettings stafiNetworkSettings = IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
         IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
 
         feePool.withdrawEther(address(this), amount);
 
-        // Calculate platform commission
-        uint256 calcBase = 1 ether;
-        uint256 platformCommission = amount.mul(stafiNetworkSettings.getPlatformFee()).div(calcBase);
-        uint256 leftFee = amount.sub(platformCommission);
-        // Calculate node share of rewards
-        uint256 nodeShare = leftFee.mul(getCurrentNodeDepositAmount()).div(32 ether);
-        leftFee = leftFee.sub(nodeShare);
-        // Calculate node commission on user share of rewards
-        uint256 nodeCommission = leftFee.mul(stafiNetworkSettings.getNodeFee()).div(calcBase);
-        // Update user reward amount
-        uint256 usersFee = leftFee.sub(nodeCommission);
-        uint256 nodeAndPlatformFee = amount.sub(usersFee);
+        uint256 nodeAndPlatformFee = amount.div(10);
+        uint256 usersFee = amount.sub(nodeAndPlatformFee);
         if (usersFee > 0) {
             stafiUserDeposit.recycleDistributorDeposit{value: usersFee}();
         }
@@ -79,21 +67,13 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         require(amount > 0, "zero amount");
 
         IStafiSuperNodeFeePool feePool = IStafiSuperNodeFeePool(getContractAddress("stafiSuperNodeFeePool"));
-        IStafiNetworkSettings stafiNetworkSettings = IStafiNetworkSettings(getContractAddress("stafiNetworkSettings"));
         IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
 
         feePool.withdrawEther(address(this), amount);
 
-        // Calculate platform commission
-        uint256 calcBase = 1 ether;
-        uint256 platformCommission = amount.mul(stafiNetworkSettings.getPlatformFee()).div(calcBase);
-        uint256 leftFee = amount.sub(platformCommission);
-        // Calculate node commission on user share of rewards
-        uint256 nodeCommission = leftFee.mul(stafiNetworkSettings.getNodeFee()).div(calcBase);
-        // Update user reward amount
-        uint256 usersFee = leftFee.sub(nodeCommission);
-        uint256 nodeAndPlatformFee = amount.sub(usersFee);
+        uint256 nodeAndPlatformFee = amount.div(10);
+        uint256 usersFee = amount.sub(nodeAndPlatformFee);
         if (usersFee > 0) {
             stafiUserDeposit.recycleDistributorDeposit{value: usersFee}();
         }

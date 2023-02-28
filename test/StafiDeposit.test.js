@@ -506,22 +506,25 @@ describe("StafiDeposit test", function () {
         let distributeTxRecipient = await distributeFeeTx.wait()
         console.log("distribute fee tx gas: ", distributeTxRecipient.gasUsed.toString())
 
-        // users: (35-35*1/10)*7/8*9/10 = 24.80625
-        // node+platform:  10.19375
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("24.80625", "ether"));
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("10.19375", "ether"));
+        // users: 35-35*1/10 = 31.5
+        // node+platform:  3.5
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("31.5", "ether"));
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("3.5", "ether"));
         expect((await ethers.provider.getBalance(this.ContractStafiFeePool.address)).toString()).to.equal(web3.utils.toWei("3", "ether"));
 
-        // distribute fee
+        // distribute super node fee
         let distributeSuperNodeFeeTx = await this.ContractStafiDistributor.connect(this.AccountUser2).distributeSuperNodeFee(web3.utils.toWei("3", "ether"), { from: this.AccountUser2.address })
         let distributeSuperNodeFeeTxRecipient = await distributeSuperNodeFeeTx.wait()
         console.log("distribute super node fee tx gas: ", distributeSuperNodeFeeTxRecipient.gasUsed.toString())
 
-        // users: (3-3*1/10)*9/10 = 2.43
-        // node+platform: 0.57
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("27.23625", "ether"));
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("10.76375", "ether"));
+        // users: 3-3*1/10 = 2.7
+        // node+platform: 0.3
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("34.2", "ether"));
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("3.8", "ether"));
         expect((await ethers.provider.getBalance(this.ContractStafiSuperNodeFeePool.address)).toString()).to.equal(web3.utils.toWei("0", "ether"));
+
+
+
 
         let tree = new balance_tree_1.default([
             { account: this.AccountNode1.address, amount: web3.utils.toWei("1", "ether") },
@@ -529,28 +532,38 @@ describe("StafiDeposit test", function () {
             { account: this.AccountNode2.address, amount: web3.utils.toWei("3", "ether") },
             { account: this.AccountNode2.address, amount: web3.utils.toWei("4", "ether") },
         ]);
-
         console.log("root: ", tree.getHexRoot());
+        let proof = tree.getProof(0, this.AccountNode1.address, web3.utils.toWei("1", "ether"))
+
+        // claim should fail before distribute
+        let claimTx = this.ContractStafiDistributor.connect(this.AccountUser1).claim(0, this.AccountNode1.address,
+            web3.utils.toWei("1", "ether"), proof, { from: this.AccountUser1.address })
+        await testing.shouldRevert(claimTx, "claim tx will revert", "invalid proof")
 
         // set merkle root
         let setMerkleRootTx = await this.ContractStafiDistributor.connect(this.AccountTrustNode1).setMerkleRoot(1, tree.getHexRoot(), { from: this.AccountTrustNode1.address })
         let setMerkleRootTxRecepient = await setMerkleRootTx.wait()
         console.log("setMerkleRoot  tx gas: ", setMerkleRootTxRecepient.gasUsed.toString())
 
-        let proof = tree.getProof(0, this.AccountNode1.address, web3.utils.toWei("1", "ether"))
         let proof2 = tree.getProof(1, this.AccountNode2.address, web3.utils.toWei("2", "ether"))
 
         let node1Balance = await ethers.provider.getBalance(this.AccountNode1.address)
         let node2Balance = await ethers.provider.getBalance(this.AccountNode2.address)
 
-        // claim
-        let claimTx = await this.ContractStafiDistributor.connect(this.AccountUser1).claim(0, this.AccountNode1.address,
+        // claim should success
+        let claimTx1 = await this.ContractStafiDistributor.connect(this.AccountUser1).claim(0, this.AccountNode1.address,
             web3.utils.toWei("1", "ether"), proof, { from: this.AccountUser1.address })
-        let claimTxRecepient = await claimTx.wait()
+        let claimTxRecepient = await claimTx1.wait()
         console.log("claim tx gas: ", claimTxRecepient.gasUsed.toString())
 
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("9.76375", "ether"));
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("2.8", "ether"));
         expect((await ethers.provider.getBalance(this.AccountNode1.address)).sub(node1Balance).toString()).to.equal(web3.utils.toWei("1", "ether"));
+
+        // dublicate claim should fail
+        let claimTx2 = this.ContractStafiDistributor.connect(this.AccountUser1).claim(0, this.AccountNode1.address,
+            web3.utils.toWei("1", "ether"), proof, { from: this.AccountUser1.address })
+        await testing.shouldRevert(claimTx2, "claim tx will revert", "claimable amount zero")
+
 
     })
 
@@ -593,7 +606,7 @@ describe("StafiDeposit test", function () {
         expect((await this.ContractStafiWithdraw.maxClaimableWithdrawIndex()).toString()).to.equal("0")
         expect((await this.ContractStafiWithdraw.totalMissingAmountForWithdraw()).toString()).to.equal("0")
 
-        // claim will fail
+        // distribute not ok, claim will fail
         let claimFailTx = this.ContractStafiWithdraw.connect(this.AccountUser1).claim([BigInt(1)], { from: this.AccountUser1.address })
         await testing.shouldRevert(claimFailTx, "claim tx will revert", "not claimable")
 
@@ -616,14 +629,14 @@ describe("StafiDeposit test", function () {
         expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("94", "ether"));//66+28
         expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("4", "ether"));//4
 
-        // claim will success
+        // after distribute, claim will success
         let claimTx = await this.ContractStafiWithdraw.connect(this.AccountUser1).claim([BigInt(1)], { from: this.AccountUser1.address })
         let claim = await claimTx.wait()
         console.log("user claim tx gas: ", claim.gasUsed.toString())
 
         expect((await ethers.provider.getBalance(this.ContractStafiWithdraw.address)).toString()).to.equal(web3.utils.toWei("0", 'ether'))
 
-        // claim will fail
+        // duplicated claim will fail
         let claimFailTx2 = this.ContractStafiWithdraw.connect(this.AccountUser1).claim([BigInt(1)], { from: this.AccountUser1.address })
         await testing.shouldRevert(claimFailTx2, "claim tx will revert", "already claimed")
     })
@@ -643,17 +656,26 @@ describe("StafiDeposit test", function () {
         expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
         expect((await this.ContractRETHToken.balanceOf(this.AccountUser1.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
 
+        // approve
         (await this.ContractRETHToken.connect(this.AccountUser1).approve(this.ContractStafiWithdraw.address, web3.utils.toWei("68", 'ether'))).wait()
 
+        // cycle limit
         let withdrawInstantlyTx = this.ContractStafiWithdraw.connect(this.AccountUser1).withdrawInstantly(web3.utils.toWei('7', 'ether'), { from: this.AccountUser1.address })
         await testing.shouldRevert(withdrawInstantlyTx, "reach cycle limit revert", "reach cycle limit")
 
+        // user limit 
         let withdrawInstantlyTx2 = this.ContractStafiWithdraw.connect(this.AccountUser1).withdrawInstantly(web3.utils.toWei('4', 'ether'), { from: this.AccountUser1.address })
         await testing.shouldRevert(withdrawInstantlyTx2, "reach user limit revert", "reach user limit")
+
+        // reth not enough
+        await this.ContractRETHToken.connect(this.AccountUser2).approve(this.ContractStafiWithdraw.address, web3.utils.toWei("68", 'ether'))
+        let withdrawInstantlyTx3 = this.ContractStafiWithdraw.connect(this.AccountUser2).withdrawInstantly(web3.utils.toWei('2', 'ether'))
+        await testing.shouldRevert(withdrawInstantlyTx3, "reach cycle limit revert", "ERC20: burn amount exceeds balance")
 
         expect((await ethers.provider.getBalance(this.ContractStafiEther.address)).toString()).to.equal(web3.utils.toWei("68", 'ether'))
         expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
         expect((await this.ContractRETHToken.balanceOf(this.AccountUser1.address)).toString()).to.equal(web3.utils.toWei("68", "ether"));
+        expect((await this.ContractRETHToken.balanceOf(this.AccountUser2.address)).toString()).to.equal(web3.utils.toWei("0", "ether"));
     })
 
     it("notifyValidatorExit should success", async function () {
@@ -671,6 +693,5 @@ describe("StafiDeposit test", function () {
         expect((await this.ContractStafiWithdraw.ejectedStartCyle()).toString()).to.equal("30")
 
         console.log((await this.ContractStafiWithdraw.currentWithdrawCycle()))
-
     })
 })
