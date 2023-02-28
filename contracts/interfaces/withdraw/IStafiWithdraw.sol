@@ -4,11 +4,10 @@ pragma solidity 0.7.6;
 
 interface IStafiWithdraw {
     // user
-    function withdrawInstantly(uint256 _rEthAmount) external;
 
-    function withdraw(uint256 _rEthAmount) external;
+    function unstake(uint256 _rEthAmount) external;
 
-    function claim(uint256[] calldata _withdrawIndexList) external;
+    function withdraw(uint256[] calldata _withdrawIndexList) external;
 
     // ejector
     function notifyValidatorExit(
