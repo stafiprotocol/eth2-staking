@@ -506,10 +506,10 @@ describe("StafiDeposit test", function () {
         let distributeTxRecipient = await distributeFeeTx.wait()
         console.log("distribute fee tx gas: ", distributeTxRecipient.gasUsed.toString())
 
-        // users: 35-35*1/10 = 31.5
-        // node+platform:  3.5
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("31.5", "ether"));
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("3.5", "ether"));
+        // node+platform:  35*0.1+（0.9*35*4/32）= 7.4375
+        // users: 35-7.4375 =27.5625
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("27.5625", "ether"));
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("7.4375", "ether"));
         expect((await ethers.provider.getBalance(this.ContractStafiFeePool.address)).toString()).to.equal(web3.utils.toWei("3", "ether"));
 
         // distribute super node fee
@@ -517,15 +517,14 @@ describe("StafiDeposit test", function () {
         let distributeSuperNodeFeeTxRecipient = await distributeSuperNodeFeeTx.wait()
         console.log("distribute super node fee tx gas: ", distributeSuperNodeFeeTxRecipient.gasUsed.toString())
 
-        // users: 3-3*1/10 = 2.7
+        // users: 3-0.3 = 2.7
         // node+platform: 0.3
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("34.2", "ether"));
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("3.8", "ether"));
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiUserDeposit.address)).toString()).to.equal(web3.utils.toWei("30.2625", "ether"));
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("7.7375", "ether"));
         expect((await ethers.provider.getBalance(this.ContractStafiSuperNodeFeePool.address)).toString()).to.equal(web3.utils.toWei("0", "ether"));
 
 
-
-
+        // construct merkle tree
         let tree = new balance_tree_1.default([
             { account: this.AccountNode1.address, amount: web3.utils.toWei("1", "ether") },
             { account: this.AccountNode2.address, amount: web3.utils.toWei("2", "ether") },
@@ -556,7 +555,7 @@ describe("StafiDeposit test", function () {
         let claimTxRecepient = await claimTx1.wait()
         console.log("claim tx gas: ", claimTxRecepient.gasUsed.toString())
 
-        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("2.8", "ether"));
+        expect((await this.ContractStafiEther.balanceOf(this.ContractStafiDistributor.address)).toString()).to.equal(web3.utils.toWei("6.7375", "ether"));
         expect((await ethers.provider.getBalance(this.AccountNode1.address)).sub(node1Balance).toString()).to.equal(web3.utils.toWei("1", "ether"));
 
         // dublicate claim should fail

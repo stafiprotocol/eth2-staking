@@ -233,9 +233,7 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         return ethAmount;
     }
 
-    function _voteProposal(
-        bytes32 _proposalId
-    ) internal onlyLatestContract("stafiWithdraw", address(this)) returns (bool) {
+    function _voteProposal(bytes32 _proposalId) internal returns (bool) {
         // Get submission keys
         bytes32 proposalNodeKey = keccak256(
             abi.encodePacked("stafiWithdraw.proposal.node.key", _proposalId, msg.sender)
