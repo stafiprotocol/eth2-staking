@@ -12,8 +12,7 @@ async function main() {
     this.FactoryStafiWithdrawProxy = await ethers.getContractFactory("StafiWithdrawProxy", this.AccountAdmin)
 
 
-    this.ContractStafiUpgrade = await ethers.getContractAt("StafiUpgrade", "0x220aF91E212419f58Eb2c3B4D99376f7Fe23f58f")
-    this.ContractStafiStorage = await ethers.getContractAt("StafiStorage", "0xA4efE44eE3D52211df575b9fD8F3409C5c1443eE")
+    this.ContractStafiUpgrade = await ethers.getContractAt("StafiUpgrade", "0x7DB65B2ccDdBca73988205639ac58090f03F7cD9")
 
 
 

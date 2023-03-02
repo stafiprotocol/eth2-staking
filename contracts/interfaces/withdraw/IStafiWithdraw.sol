@@ -25,6 +25,8 @@ interface IStafiWithdraw {
         uint256 _maxClaimableWithdrawIndex
     ) external;
 
+    function reserveEthForWithdraw(uint256 _withdrawCycle) external;
+
     function depositEth() external payable;
 
     function getUnclaimedWithdrawalsOfUser(address user) external view returns (uint256[] memory);

@@ -68,7 +68,6 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         // Check deposit settings
         require(getDepositEnabled(), "Deposits into Stafi are currently disabled");
         require(msg.value >= getMinimumDeposit(), "The deposited amount is less than the minimum deposit size");
-        // require(getBalance().add(msg.value) <= getMaximumDepositPoolSize(), "The deposit pool size after depositing exceeds the maximum size");
         // Load contracts
         IRETHToken rETHToken = IRETHToken(getContractAddress("rETHToken"));
         // Mint rETH to user account
@@ -150,7 +149,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         IRETHToken rETHToken = IRETHToken(getContractAddress("rETHToken"));
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
         // Check amount
-        require(_amount <= getExcessBalance(), "Insufficient excess balance for withdrawal");
+        require(_amount <= getBalance(), "Insufficient balance for withdrawal");
         // Withdraw ETH from vault
         stafiEther.withdrawEther(_amount);
         // Transfer to rETH contract
@@ -165,7 +164,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         IStafiSuperNode superNode = IStafiSuperNode(getContractAddress("stafiSuperNode"));
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
         // Check amount
-        require(_amount <= getExcessBalance(), "Insufficient balance for withdrawal");
+        require(_amount <= getBalance(), "Insufficient balance for withdrawal");
         // Withdraw ETH from vault
         stafiEther.withdrawEther(_amount);
         // Transfer to superNode contract
@@ -180,7 +179,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         IStafiLightNode lightNode = IStafiLightNode(getContractAddress("stafiLightNode"));
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
         // Check amount
-        require(_amount <= getExcessBalance(), "Insufficient balance for withdrawal");
+        require(_amount <= getBalance(), "Insufficient balance for withdrawal");
         // Withdraw ETH from vault
         stafiEther.withdrawEther(_amount);
         // Transfer to superNode contract
@@ -195,7 +194,7 @@ contract StafiUserDeposit is StafiBase, IStafiUserDeposit, IStafiEtherWithdrawer
         IStafiWithdraw stafiWithdraw = IStafiWithdraw(getContractAddress("stafiWithdraw"));
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
         // Check amount
-        require(_amount <= getExcessBalance(), "Insufficient balance for withdrawal");
+        require(_amount <= getBalance(), "Insufficient balance for withdrawal");
         // Withdraw ETH from vault
         stafiEther.withdrawEther(_amount);
         // Transfer to superNode contract

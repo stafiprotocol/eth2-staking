@@ -62,7 +62,7 @@ module.exports = {
         '45a690ae0fab855d60f592b2cd561a730a1d3ab60e138c5366b9e27778c066d9', // supernode
         '9e078940152584a642aaed17ebb97509274f874e176695de947ade3a1d8fe353', // user1
         'b7d6bef9fec45408c5d6c7f3182ab409f0774549481179ee627e87b8ec43980f', // 
-        'cf9021015de4fe7559b981e098f46659b7f9a9dc28e89b7f554936c7aadaf822', // proxyadmin
+        'cf9021015de4fe7559b981e098f46659b7f9a9dc28e89b7f554936c7aadaf822', // proxyadmin 0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc
       ],
     }
   },

@@ -26,19 +26,29 @@ async function main() {
     //     to: "0xd59ba3B7119613ECc514f8DbAF2a81e7c9e302A2",
     //     value: web3.utils.toWei("0.1", "ether")
     // })
-    this.ContractStafiSuperNode = await ethers.getContractAt("StafiSuperNode", "0xfa052FB4D0C530bDCBA7bF0C675515d3f12313b6")
-    this.ContractStafiLightNode = await ethers.getContractAt("StafiLightNode", "0x4FEEA697bE14596c672681b92B1dfA41b654955b")
-    this.ContractStafiUserDeposit = await ethers.getContractAt("StafiUserDeposit", "0x70C5744d377aE6E9926CcBCF19D501340CB26285")
-    this.ContractStafiNetworkSettings = await ethers.getContractAt("StafiNetworkSettings", "0x430CB4F814EaA5816E3845f31A5EC3803bDa5B9F")
-    this.ContractStafiNodeManager = await ethers.getContractAt("StafiNodeManager", "0x24aF013ef04c4F75B9DC7d7F1431c92ecf706117")
-    this.ContractRETHToken = await ethers.getContractAt("RETHToken", "0xE6b876ED4e9191645484FC8940A35784381c2f9B")
+    // this.ContractStafiSuperNode = await ethers.getContractAt("StafiSuperNode", "0xfa052FB4D0C530bDCBA7bF0C675515d3f12313b6")
+    // this.ContractStafiLightNode = await ethers.getContractAt("StafiLightNode", "0x4FEEA697bE14596c672681b92B1dfA41b654955b")
+    // this.ContractStafiUserDeposit = await ethers.getContractAt("StafiUserDeposit", "0x70C5744d377aE6E9926CcBCF19D501340CB26285")
+    // this.ContractStafiNetworkSettings = await ethers.getContractAt("StafiNetworkSettings", "0x430CB4F814EaA5816E3845f31A5EC3803bDa5B9F")
+
+    // this.ContractStafiNodeManager = await ethers.getContractAt("StafiNodeManager", "0x04685AAa7Dd89739EB5Df8eC8B81C644589B5c95")
+
+    // this.ContractStafiStorage = await ethers.getContractAt("StafiStorage", "0x04685AAa7Dd89739EB5Df8eC8B81C644589B5c95")
+
+    // this.ContractRETHToken = await ethers.getContractAt("RETHToken", "0xE6b876ED4e9191645484FC8940A35784381c2f9B")
     // this.ContractStafiUpgrade = await ethers.getContractAt("StafiUpgrade", "0x220aF91E212419f58Eb2c3B4D99376f7Fe23f58f")
     // await this.ContractRETHToken.connect(this.AccountAdmin).setBurnEnabled(true)
     // return
     // console.log(await this.ContractRETHToken.balanceOf("0x9b9B08aF1441BF50cd0d7a2D637049e2E36E06Cb"))
-    console.log("exchange rate", await this.ContractRETHToken.getExchangeRate())
+    // console.log("exchange rate", await this.ContractRETHToken.getExchangeRate())
     // await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeSuper("0xfe15cf269aA7cf067210d73AC228E37F89df3534", true)
-    console.log("getSuperNodeExists", await this.ContractStafiNodeManager.getSuperNodeExists("0xfe15cf269aA7cf067210d73AC228E37F89df3534"))
+    // console.log("getSuperNodeExists", await this.ContractStafiNodeManager.getSuperNodeExists("0xfe15cf269aA7cf067210d73AC228E37F89df3534"))
+
+    // this.ContractStafiWithdraw = await ethers.getContractAt("StafiWithdraw", "0xcabAaE1D00e697c81a9E2c5fA30D8A99735aC6a6")
+
+    // await this.ContractStafiWithdraw.initialize("0x126d3C08Fb282d5417793B7677E3F7DA8347A384", web3.utils.toWei('10', 'ether'), web3.utils.toWei('5', 'ether'))
+
+    // console.log("storage", await this.ContractStafiStorage.getSuperNodeExists("0xfe15cf269aA7cf067210d73AC228E37F89df3534"))
     return
     // enable deposit
     // await this.ContractStafiLightNode.connect(this.AccountAdmin).setLightNodeDepositEnabled(true)

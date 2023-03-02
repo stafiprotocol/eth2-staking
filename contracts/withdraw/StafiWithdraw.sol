@@ -78,6 +78,25 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         emit EtherDeposited(msg.sender, msg.value, block.timestamp);
     }
 
+    // ------------ getter ------------
+
+    function getUnclaimedWithdrawalsOfUser(address user) external view override returns (uint256[] memory) {
+        uint256 length = unclaimedWithdrawalsOfUser[user].length();
+        uint256[] memory withdrawals = new uint256[](length);
+        for (uint256 i = 0; i < length; i++) {
+            withdrawals[i] = (unclaimedWithdrawalsOfUser[user].at(i));
+        }
+        return withdrawals;
+    }
+
+    function getEjectedValidatorsAtCycle(uint256 cycle) external view override returns (uint256[] memory) {
+        return ejectedValidatorsAtCycle[cycle];
+    }
+
+    function currentWithdrawCycle() public view returns (uint256) {
+        return block.timestamp.sub(28800).div(86400);
+    }
+
     // ------------ settings ------------
 
     function setWithdrawLimitPerCycle(uint256 _withdrawLimitPerCycle) external onlySuperUser {
@@ -184,6 +203,30 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         }
     }
 
+    function reserveEthForWithdraw(
+        uint256 _withdrawCycle
+    ) external override onlyLatestContract("stafiWithdraw", address(this)) onlyTrustedNode(msg.sender) {
+        bytes32 proposalId = keccak256(abi.encodePacked("reserveEthForWithdraw", _withdrawCycle));
+        bool needExe = _voteProposal(proposalId);
+
+        // Finalize if Threshold has been reached
+        if (needExe) {
+            IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
+            uint256 depositPoolBalance = stafiUserDeposit.getBalance();
+
+            if (depositPoolBalance > 0 && totalMissingAmountForWithdraw > 0) {
+                uint256 mvAmount = totalMissingAmountForWithdraw;
+                if (depositPoolBalance < mvAmount) {
+                    mvAmount = depositPoolBalance;
+                }
+                stafiUserDeposit.withdrawExcessBalanceForWithdraw(mvAmount);
+
+                totalMissingAmountForWithdraw = totalMissingAmountForWithdraw.sub(mvAmount);
+            }
+            _afterExecProposal(proposalId);
+        }
+    }
+
     function notifyValidatorExit(
         uint256 _withdrawCycle,
         uint256 _ejectedStartCycle,
@@ -214,6 +257,7 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     // return:
     // 1 eth withdraw amount
     function _processWithdraw(uint256 _rEthAmount) private returns (uint256) {
+        require(_rEthAmount > 0, "amount zero");
         address rEthAddress = getContractAddress("rETHToken");
         uint256 ethAmount = IRETHToken(rEthAddress).getEthValue(_rEthAmount);
         uint256 currentCycle = currentWithdrawCycle();
@@ -268,24 +312,5 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         setBool(proposalKey, true);
 
         emit ProposalExecuted(_proposalId);
-    }
-
-    // ------------ getter ------------
-
-    function getUnclaimedWithdrawalsOfUser(address user) external view override returns (uint256[] memory) {
-        uint256 length = unclaimedWithdrawalsOfUser[user].length();
-        uint256[] memory withdrawals = new uint256[](length);
-        for (uint256 i = 0; i < length; i++) {
-            withdrawals[i] = (unclaimedWithdrawalsOfUser[user].at(i));
-        }
-        return withdrawals;
-    }
-
-    function getEjectedValidatorsAtCycle(uint256 cycle) external view override returns (uint256[] memory) {
-        return ejectedValidatorsAtCycle[cycle];
-    }
-
-    function currentWithdrawCycle() public view returns (uint256) {
-        return block.timestamp.sub(28800).div(86400);
     }
 }
