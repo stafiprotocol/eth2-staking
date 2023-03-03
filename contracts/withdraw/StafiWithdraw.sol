@@ -170,6 +170,8 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         uint256 _maxClaimableWithdrawIndex
     ) external override onlyLatestContract("stafiWithdraw", address(this)) onlyTrustedNode(msg.sender) {
         require(_dealedHeight > latestDistributeHeight, "height already dealed");
+        require(_maxClaimableWithdrawIndex < nextWithdrawIndex, "withdraw index over");
+
         bytes32 proposalId = keccak256(
             abi.encodePacked(_dealedHeight, _userAmount, _nodeAmount, _platformAmount, _maxClaimableWithdrawIndex)
         );
@@ -197,7 +199,9 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
             // distribute withdrawals
             IStafiDistributor stafiDistributor = IStafiDistributor(getContractAddress("stafiDistributor"));
             uint256 nodeAndPlatformAmount = _nodeAmount.add(_platformAmount);
-            stafiDistributor.distributeWithdrawals{value: nodeAndPlatformAmount}();
+            if (nodeAndPlatformAmount > 0) {
+                stafiDistributor.distributeWithdrawals{value: nodeAndPlatformAmount}();
+            }
 
             _afterExecProposal(proposalId);
         }
