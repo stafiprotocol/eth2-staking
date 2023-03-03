@@ -143,6 +143,8 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     function withdraw(
         uint256[] calldata _withdrawIndexList
     ) external override onlyLatestContract("stafiWithdraw", address(this)) {
+        require(_withdrawIndexList.length > 0, "index list empty");
+
         uint256 totalAmount;
         for (uint256 i = 0; i < _withdrawIndexList.length; i++) {
             uint256 withdrawIndex = _withdrawIndexList[i];
@@ -261,9 +263,10 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     // return:
     // 1 eth withdraw amount
     function _processWithdraw(uint256 _rEthAmount) private returns (uint256) {
-        require(_rEthAmount > 0, "amount zero");
+        require(_rEthAmount > 0, "reth amount zero");
         address rEthAddress = getContractAddress("rETHToken");
         uint256 ethAmount = IRETHToken(rEthAddress).getEthValue(_rEthAmount);
+        require(ethAmount > 0, "eth amount zero");
         uint256 currentCycle = currentWithdrawCycle();
         require(totalWithdrawAmountAtCycle[currentCycle].add(ethAmount) <= withdrawLimitPerCycle, "reach cycle limit");
         require(
