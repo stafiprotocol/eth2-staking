@@ -32,6 +32,14 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         return getUint("settings.node.deposit.amount");
     }
 
+    function getMerkleDealedEpoch() public view returns (uint256) {
+        return getUint(keccak256(abi.encodePacked("stafiDistributor.merkleRoot.dealedEpoch")));
+    }
+
+    function getTotalClaimed(address _account) public view returns (uint256) {
+        return getUint(keccak256(abi.encodePacked("stafiDistributor.node.totalClaimed", _account)));
+    }
+
     receive() external payable {}
 
     // Receive a ether withdrawal
@@ -55,8 +63,10 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         uint256 totalAmount = _userAmount.add(_nodeAmount).add(_platformAmount);
         require(totalAmount > 0, "zero amount");
 
-        uint256 preDealedHeight = getUint(keccak256(abi.encodePacked("stafiDistributor.distributeFee.dealedHeight")));
-        require(_dealedHeight > preDealedHeight, "height already dealed");
+        require(
+            _dealedHeight > getUint(keccak256(abi.encodePacked("stafiDistributor.distributeFee.dealedHeight"))),
+            "height already dealed"
+        );
 
         bytes32 proposalId = keccak256(abi.encodePacked(_dealedHeight, _userAmount, _nodeAmount, _platformAmount));
         bool needExe = _voteProposal(proposalId);
@@ -145,7 +155,7 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         uint256 _dealedEpoch,
         bytes32 _merkleRoot
     ) external onlyLatestContract("stafiDistributor", address(this)) onlyTrustedNode(msg.sender) {
-        uint256 predealedEpoch = getUint(keccak256(abi.encodePacked("stafiDistributor.merkleRoot.dealedEpoch")));
+        uint256 predealedEpoch = getMerkleDealedEpoch();
         require(_dealedEpoch > predealedEpoch, "epoch already dealed");
 
         bytes32 proposalId = keccak256(abi.encodePacked(_dealedEpoch, _merkleRoot));
@@ -154,7 +164,7 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         // Finalize if Threshold has been reached
         if (needExe) {
             setBytes32(keccak256(abi.encodePacked("stafiDistributor.merkleRoot")), _merkleRoot);
-            setUint(keccak256(abi.encodePacked("stafiDistributor.merkleRoot.dealedEpoch")), _dealedEpoch);
+            setMerkleDealedEpoch(_dealedEpoch);
 
             _afterExecProposal(proposalId);
         }
@@ -166,7 +176,7 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         uint256 _totalAmount,
         bytes32[] calldata _merkleProof
     ) external onlyLatestContract("stafiDistributor", address(this)) {
-        uint256 totalClaimed = getUint(keccak256(abi.encodePacked("stafiDistributor.node.totalClaimed", _account)));
+        uint256 totalClaimed = getTotalClaimed(_account);
         require(_totalAmount > totalClaimed, "claimable amount zero");
         bytes32 merkleRoot = getBytes32(keccak256(abi.encodePacked("stafiDistributor.merkleRoot")));
 
@@ -175,7 +185,7 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         require(MerkleProof.verify(_merkleProof, merkleRoot, node), "invalid proof");
 
         // Mark it claimed and send the token.
-        setUint(keccak256(abi.encodePacked("stafiDistributor.node.totalClaimed", _account)), _totalAmount);
+        setTotalClaimed(_account, _totalAmount);
 
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
         uint256 willClaimAmount = _totalAmount.sub(totalClaimed);
@@ -184,6 +194,16 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         require(success, "failed to claim ETH");
 
         emit Claimed(_index, _account, willClaimAmount, _totalAmount);
+    }
+
+    // --- helper ----
+
+    function setTotalClaimed(address _account, uint256 _totalAmount) internal {
+        setUint(keccak256(abi.encodePacked("stafiDistributor.node.totalClaimed", _account)), _totalAmount);
+    }
+
+    function setMerkleDealedEpoch(uint256 _dealedEpoch) internal {
+        setUint(keccak256(abi.encodePacked("stafiDistributor.merkleRoot.dealedEpoch")), _dealedEpoch);
     }
 
     function _voteProposal(bytes32 _proposalId) internal returns (bool) {
