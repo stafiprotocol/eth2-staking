@@ -503,8 +503,9 @@ describe("StafiDeposit test", function () {
             to: this.ContractStafiSuperNodeFeePool.address,
             value: web3.utils.toWei("3", "ether")
         })
+        
         // distribute fee
-        let distributeFeeTx = await this.ContractStafiDistributor.connect(this.AccountUser2).distributeFee(web3.utils.toWei("35", "ether"), { from: this.AccountUser2.address })
+        let distributeFeeTx = await this.ContractStafiDistributor.connect(this.AccountTrustNode1).distributeFee(web3.utils.toWei("35", "ether"), { from: this.AccountUser2.address })
         let distributeTxRecipient = await distributeFeeTx.wait()
         console.log("distribute fee tx gas: ", distributeTxRecipient.gasUsed.toString())
 

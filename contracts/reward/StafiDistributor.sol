@@ -46,24 +46,40 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
 
     // platform = 5%  node = 5% + (90% * nodedeposit/32)
     // distribute fee of feePool for user/node/platform
-    function distributeFee(uint256 _amount) external onlyLatestContract("stafiDistributor", address(this)) {
-        require(_amount > 0, "zero amount");
+    function distributeFee(
+        uint256 _dealedHeight,
+        uint256 _userAmount,
+        uint256 _nodeAmount,
+        uint256 _platformAmount
+    ) external onlyLatestContract("stafiDistributor", address(this)) onlyTrustedNode(msg.sender) {
+        uint256 totalAmount = _userAmount.add(_nodeAmount).add(_platformAmount);
+        require(totalAmount > 0, "zero amount");
 
-        IStafiFeePool feePool = IStafiFeePool(getContractAddress("stafiFeePool"));
-        IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
-        IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
+        uint256 preDealedHeight = getUint(keccak256(abi.encodePacked("stafiDistributor.distributeFee.dealedHeight")));
+        require(_dealedHeight > preDealedHeight, "height already dealed");
 
-        feePool.withdrawEther(address(this), _amount);
+        bytes32 proposalId = keccak256(abi.encodePacked(_dealedHeight, _userAmount, _nodeAmount, _platformAmount));
+        bool needExe = _voteProposal(proposalId);
 
-        uint256 nodeAndPlatformFee = _amount.div(10).add(
-            _amount.mul(9).mul(getCurrentNodeDepositAmount()).div(320 ether)
-        );
-        uint256 usersFee = _amount.sub(nodeAndPlatformFee);
-        if (usersFee > 0) {
-            stafiUserDeposit.recycleDistributorDeposit{value: usersFee}();
-        }
-        if (nodeAndPlatformFee > 0) {
-            stafiEther.depositEther{value: nodeAndPlatformFee}();
+        // Finalize if Threshold has been reached
+        if (needExe) {
+            IStafiFeePool feePool = IStafiFeePool(getContractAddress("stafiFeePool"));
+            IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
+            IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
+
+            feePool.withdrawEther(address(this), totalAmount);
+
+            uint256 nodeAndPlatformAmount = _nodeAmount.add(_platformAmount);
+
+            if (_userAmount > 0) {
+                stafiUserDeposit.recycleDistributorDeposit{value: _userAmount}();
+            }
+            if (nodeAndPlatformAmount > 0) {
+                stafiEther.depositEther{value: nodeAndPlatformAmount}();
+            }
+            setUint(keccak256(abi.encodePacked("stafiDistributor.distributeFee.dealedHeight")), _dealedHeight);
+
+            _afterExecProposal(proposalId);
         }
     }
 
@@ -126,19 +142,19 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
 
     // ----- node claim --------------
     function setMerkleRoot(
-        uint256 _dealedHeight,
+        uint256 _dealedEpoch,
         bytes32 _merkleRoot
     ) external onlyLatestContract("stafiDistributor", address(this)) onlyTrustedNode(msg.sender) {
-        uint256 preDealedHeight = getUint(keccak256(abi.encodePacked("stafiDistributor.merkleRoot.dealedHeight")));
-        require(_dealedHeight > preDealedHeight, "height already dealed");
+        uint256 predealedEpoch = getUint(keccak256(abi.encodePacked("stafiDistributor.merkleRoot.dealedEpoch")));
+        require(_dealedEpoch > predealedEpoch, "epoch already dealed");
 
-        bytes32 proposalId = keccak256(abi.encodePacked(_dealedHeight, _merkleRoot));
+        bytes32 proposalId = keccak256(abi.encodePacked(_dealedEpoch, _merkleRoot));
         bool needExe = _voteProposal(proposalId);
 
         // Finalize if Threshold has been reached
         if (needExe) {
             setBytes32(keccak256(abi.encodePacked("stafiDistributor.merkleRoot")), _merkleRoot);
-            setUint(keccak256(abi.encodePacked("stafiDistributor.merkleRoot.dealedHeight")), _dealedHeight);
+            setUint(keccak256(abi.encodePacked("stafiDistributor.merkleRoot.dealedEpoch")), _dealedEpoch);
 
             _afterExecProposal(proposalId);
         }
