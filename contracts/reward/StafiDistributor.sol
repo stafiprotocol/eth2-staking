@@ -12,13 +12,20 @@ import "../interfaces/reward/IStafiSuperNodeFeePool.sol";
 import "../interfaces/reward/IStafiDistributor.sol";
 import "../interfaces/IStafiEtherWithdrawer.sol";
 import "../interfaces/node/IStafiNodeManager.sol";
+import "../types/ClaimType.sol";
 
 // Distribute network validator priorityFees/withdrawals/slashs
 contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor {
     // Libs
     using SafeMath for uint256;
 
-    event Claimed(uint256 index, address account, uint256 claimedAmount, uint256 totalAmount);
+    event Claimed(
+        uint256 index,
+        address account,
+        uint256 claimableReward,
+        uint256 claimableDeposit,
+        ClaimType claimType
+    );
     event VoteProposal(bytes32 indexed proposalId, address voter);
     event ProposalExecuted(bytes32 indexed proposalId);
 
@@ -36,8 +43,16 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         return getUint(keccak256(abi.encodePacked("stafiDistributor.merkleRoot.dealedEpoch")));
     }
 
-    function getTotalClaimed(address _account) public view returns (uint256) {
-        return getUint(keccak256(abi.encodePacked("stafiDistributor.node.totalClaimed", _account)));
+    function getTotalClaimedReward(address _account) public view returns (uint256) {
+        return getUint(keccak256(abi.encodePacked("stafiDistributor.node.totalClaimedReward", _account)));
+    }
+
+    function getTotalClaimedDeposit(address _account) public view returns (uint256) {
+        return getUint(keccak256(abi.encodePacked("stafiDistributor.node.totalClaimedDeposit", _account)));
+    }
+
+    function getMerkleRoot() public view returns (bytes32) {
+        return getBytes32(keccak256(abi.encodePacked("stafiDistributor.merkleRoot")));
     }
 
     receive() external payable {}
@@ -163,7 +178,7 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
 
         // Finalize if Threshold has been reached
         if (needExe) {
-            setBytes32(keccak256(abi.encodePacked("stafiDistributor.merkleRoot")), _merkleRoot);
+            setMerkleRoot(_merkleRoot);
             setMerkleDealedEpoch(_dealedEpoch);
 
             _afterExecProposal(proposalId);
@@ -173,37 +188,63 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
     function claim(
         uint256 _index,
         address _account,
-        uint256 _totalAmount,
-        bytes32[] calldata _merkleProof
+        uint256 _totalRewardAmount,
+        uint256 _totalDepositAmount,
+        bytes32[] calldata _merkleProof,
+        ClaimType _claimType
     ) external onlyLatestContract("stafiDistributor", address(this)) {
-        uint256 totalClaimed = getTotalClaimed(_account);
-        require(_totalAmount > totalClaimed, "claimable amount zero");
-        bytes32 merkleRoot = getBytes32(keccak256(abi.encodePacked("stafiDistributor.merkleRoot")));
+        uint256 claimableReward = _totalRewardAmount.sub(getTotalClaimedReward(_account));
+        uint256 claimableDeposit = _totalDepositAmount.sub(getTotalClaimedDeposit(_account));
 
         // Verify the merkle proof.
-        bytes32 node = keccak256(abi.encodePacked(_index, _account, _totalAmount));
-        require(MerkleProof.verify(_merkleProof, merkleRoot, node), "invalid proof");
+        bytes32 node = keccak256(abi.encodePacked(_index, _account, _totalRewardAmount, _totalDepositAmount));
+        require(MerkleProof.verify(_merkleProof, getMerkleRoot(), node), "invalid proof");
 
-        // Mark it claimed and send the token.
-        setTotalClaimed(_account, _totalAmount);
+        uint256 willClaimAmount;
+        if (_claimType == ClaimType.CLAIMREWARD) {
+            require(claimableReward > 0, "no claimable reward");
+
+            setTotalClaimedReward(_account, _totalRewardAmount);
+            willClaimAmount = claimableReward;
+        } else if (_claimType == ClaimType.CLAIMDEPOSIT) {
+            require(claimableDeposit > 0, "no claimable deposit");
+
+            setTotalClaimedDeposit(_account, _totalDepositAmount);
+            willClaimAmount = claimableDeposit;
+        } else if (_claimType == ClaimType.CLAIMTOTAL) {
+            willClaimAmount = claimableReward.add(claimableDeposit);
+            require(willClaimAmount > 0, "no claimable amount");
+
+            setTotalClaimedReward(_account, _totalRewardAmount);
+            setTotalClaimedDeposit(_account, _totalDepositAmount);
+        } else {
+            revert("unknown claimType");
+        }
 
         IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
-        uint256 willClaimAmount = _totalAmount.sub(totalClaimed);
         stafiEther.withdrawEther(willClaimAmount);
         (bool success, ) = _account.call{value: willClaimAmount}("");
         require(success, "failed to claim ETH");
 
-        emit Claimed(_index, _account, willClaimAmount, _totalAmount);
+        emit Claimed(_index, _account, claimableReward, claimableDeposit, _claimType);
     }
 
     // --- helper ----
 
-    function setTotalClaimed(address _account, uint256 _totalAmount) internal {
-        setUint(keccak256(abi.encodePacked("stafiDistributor.node.totalClaimed", _account)), _totalAmount);
+    function setTotalClaimedReward(address _account, uint256 _totalAmount) internal {
+        setUint(keccak256(abi.encodePacked("stafiDistributor.node.totalClaimedReward", _account)), _totalAmount);
+    }
+
+    function setTotalClaimedDeposit(address _account, uint256 _totalAmount) internal {
+        setUint(keccak256(abi.encodePacked("stafiDistributor.node.totalClaimedDeposit", _account)), _totalAmount);
     }
 
     function setMerkleDealedEpoch(uint256 _dealedEpoch) internal {
         setUint(keccak256(abi.encodePacked("stafiDistributor.merkleRoot.dealedEpoch")), _dealedEpoch);
+    }
+
+    function setMerkleRoot(bytes32 _merkleRoot) internal {
+        setBytes32(keccak256(abi.encodePacked("stafiDistributor.merkleRoot")), _merkleRoot);
     }
 
     function _voteProposal(bytes32 _proposalId) internal returns (bool) {
