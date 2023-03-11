@@ -55,6 +55,10 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         return getBytes32(keccak256(abi.encodePacked("stafiDistributor.merkleRoot")));
     }
 
+    function getDistributeFeeDealedHeight() public view returns (uint256) {
+        return getUint(keccak256(abi.encodePacked("stafiDistributor.distributeFee.dealedHeight")));
+    }
+
     receive() external payable {}
 
     // Receive a ether withdrawal
@@ -78,10 +82,7 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         uint256 totalAmount = _userAmount.add(_nodeAmount).add(_platformAmount);
         require(totalAmount > 0, "zero amount");
 
-        require(
-            _dealedHeight > getUint(keccak256(abi.encodePacked("stafiDistributor.distributeFee.dealedHeight"))),
-            "height already dealed"
-        );
+        require(_dealedHeight > getDistributeFeeDealedHeight(), "height already dealed");
 
         bytes32 proposalId = keccak256(abi.encodePacked(_dealedHeight, _userAmount, _nodeAmount, _platformAmount));
         bool needExe = _voteProposal(proposalId);
@@ -102,7 +103,8 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
             if (nodeAndPlatformAmount > 0) {
                 stafiEther.depositEther{value: nodeAndPlatformAmount}();
             }
-            setUint(keccak256(abi.encodePacked("stafiDistributor.distributeFee.dealedHeight")), _dealedHeight);
+
+            setDistributeFeeDealedHeight(_dealedHeight);
 
             _afterExecProposal(proposalId);
         }
@@ -189,15 +191,15 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         uint256 _index,
         address _account,
         uint256 _totalRewardAmount,
-        uint256 _totalDepositAmount,
+        uint256 _totalExitDepositAmount,
         bytes32[] calldata _merkleProof,
         ClaimType _claimType
     ) external onlyLatestContract("stafiDistributor", address(this)) {
         uint256 claimableReward = _totalRewardAmount.sub(getTotalClaimedReward(_account));
-        uint256 claimableDeposit = _totalDepositAmount.sub(getTotalClaimedDeposit(_account));
+        uint256 claimableDeposit = _totalExitDepositAmount.sub(getTotalClaimedDeposit(_account));
 
         // Verify the merkle proof.
-        bytes32 node = keccak256(abi.encodePacked(_index, _account, _totalRewardAmount, _totalDepositAmount));
+        bytes32 node = keccak256(abi.encodePacked(_index, _account, _totalRewardAmount, _totalExitDepositAmount));
         require(MerkleProof.verify(_merkleProof, getMerkleRoot(), node), "invalid proof");
 
         uint256 willClaimAmount;
@@ -209,14 +211,14 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         } else if (_claimType == ClaimType.CLAIMDEPOSIT) {
             require(claimableDeposit > 0, "no claimable deposit");
 
-            setTotalClaimedDeposit(_account, _totalDepositAmount);
+            setTotalClaimedDeposit(_account, _totalExitDepositAmount);
             willClaimAmount = claimableDeposit;
         } else if (_claimType == ClaimType.CLAIMTOTAL) {
             willClaimAmount = claimableReward.add(claimableDeposit);
             require(willClaimAmount > 0, "no claimable amount");
 
             setTotalClaimedReward(_account, _totalRewardAmount);
-            setTotalClaimedDeposit(_account, _totalDepositAmount);
+            setTotalClaimedDeposit(_account, _totalExitDepositAmount);
         } else {
             revert("unknown claimType");
         }
@@ -245,6 +247,10 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
 
     function setMerkleRoot(bytes32 _merkleRoot) internal {
         setBytes32(keccak256(abi.encodePacked("stafiDistributor.merkleRoot")), _merkleRoot);
+    }
+
+    function setDistributeFeeDealedHeight(uint256 _dealedHeight) internal {
+        setUint(keccak256(abi.encodePacked("stafiDistributor.distributeFee.dealedHeight")), _dealedHeight);
     }
 
     function _voteProposal(bytes32 _proposalId) internal returns (bool) {
