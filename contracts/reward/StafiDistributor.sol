@@ -28,6 +28,10 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
     );
     event VoteProposal(bytes32 indexed proposalId, address voter);
     event ProposalExecuted(bytes32 indexed proposalId);
+    event DistributeFee(uint256 dealedHeight, uint256 userAmount, uint256 nodeAmount, uint256 platformAmount);
+    event DistributeSuperNodeFee(uint256 dealedHeight, uint256 userAmount, uint256 nodeAmount, uint256 platformAmount);
+    event DistributeSlash(uint256 dealedHeight, uint256 slashAmount);
+    event SetMerkleRoot(uint256 dealedEpoch, bytes32 merkleRoot);
 
     // Construct
     constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
@@ -59,6 +63,14 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         return getUint(keccak256(abi.encodePacked("stafiDistributor.distributeFee.dealedHeight")));
     }
 
+    function getDistributeSuperNodeFeeDealedHeight() public view returns (uint256) {
+        return getUint(keccak256(abi.encodePacked("stafiDistributor.distributeSuperNodeFee.dealedHeight")));
+    }
+
+    function getDistributeSlashDealedHeight() public view returns (uint256) {
+        return getUint(keccak256(abi.encodePacked("stafiDistributor.distributeSlashAmount.dealedHeight")));
+    }
+
     receive() external payable {}
 
     // Receive a ether withdrawal
@@ -71,7 +83,16 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         onlyLatestContract("stafiEther", msg.sender)
     {}
 
-    // platform = 5%  node = 5% + (90% * nodedeposit/32)
+    // distribute withdrawals for node/platform, accept calls from stafiWithdraw
+    function distributeWithdrawals() external payable override onlyLatestContract("stafiDistributor", address(this)) {
+        require(msg.value > 0, "zero amount");
+
+        IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
+        stafiEther.depositEther{value: msg.value}();
+    }
+
+    // v1: platform = 10% node = 90%*(nodedeposit/32)+90%*(1- nodedeposit/32)*10%  user = 90%*(1- nodedeposit/32)*90%
+    // v2: platform = 5%  node = 5% + (90% * nodedeposit/32) user = 90%*(1-nodedeposit/32)
     // distribute fee of feePool for user/node/platform
     function distributeFee(
         uint256 _dealedHeight,
@@ -107,35 +128,53 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
             setDistributeFeeDealedHeight(_dealedHeight);
 
             _afterExecProposal(proposalId);
+
+            emit DistributeFee(_dealedHeight, _userAmount, _nodeAmount, _platformAmount);
         }
     }
 
+    // v1: platform = 10% node = 9%  user = 81%
+    // v2: platform = 5%  node = 5%  user = 90%
     // distribute fee of superNode feePool for user/node/platform
-    function distributeSuperNodeFee(uint256 _amount) external onlyLatestContract("stafiDistributor", address(this)) {
-        require(_amount > 0, "zero amount");
+    function distributeSuperNodeFee(
+        uint256 _dealedHeight,
+        uint256 _userAmount,
+        uint256 _nodeAmount,
+        uint256 _platformAmount
+    ) external onlyLatestContract("stafiDistributor", address(this)) {
+        uint256 totalAmount = _userAmount.add(_nodeAmount).add(_platformAmount);
+        require(totalAmount > 0, "zero amount");
 
-        IStafiSuperNodeFeePool feePool = IStafiSuperNodeFeePool(getContractAddress("stafiSuperNodeFeePool"));
-        IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
-        IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
+        require(_dealedHeight > getDistributeSuperNodeFeeDealedHeight(), "height already dealed");
 
-        feePool.withdrawEther(address(this), _amount);
+        bytes32 proposalId = keccak256(
+            abi.encodePacked("distributeSuperNodeFee", _dealedHeight, _userAmount, _nodeAmount, _platformAmount)
+        );
+        bool needExe = _voteProposal(proposalId);
 
-        uint256 nodeAndPlatformFee = _amount.div(10);
-        uint256 usersFee = _amount.sub(nodeAndPlatformFee);
-        if (usersFee > 0) {
-            stafiUserDeposit.recycleDistributorDeposit{value: usersFee}();
+        // Finalize if Threshold has been reached
+        if (needExe) {
+            IStafiFeePool feePool = IStafiFeePool(getContractAddress("stafiFeePool"));
+            IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
+            IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
+
+            feePool.withdrawEther(address(this), totalAmount);
+
+            uint256 nodeAndPlatformAmount = _nodeAmount.add(_platformAmount);
+
+            if (_userAmount > 0) {
+                stafiUserDeposit.recycleDistributorDeposit{value: _userAmount}();
+            }
+            if (nodeAndPlatformAmount > 0) {
+                stafiEther.depositEther{value: nodeAndPlatformAmount}();
+            }
+
+            setDistributeSuperNodeFeeDealedHeight(_dealedHeight);
+
+            _afterExecProposal(proposalId);
+
+            emit DistributeSuperNodeFee(_dealedHeight, _userAmount, _nodeAmount, _platformAmount);
         }
-        if (nodeAndPlatformFee > 0) {
-            stafiEther.depositEther{value: nodeAndPlatformFee}();
-        }
-    }
-
-    // distribute withdrawals for node/platform, accept calls from stafiWithdraw
-    function distributeWithdrawals() external payable override onlyLatestContract("stafiDistributor", address(this)) {
-        require(msg.value > 0, "zero amount");
-
-        IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
-        stafiEther.depositEther{value: msg.value}();
     }
 
     // distribute slash amount for user
@@ -145,12 +184,9 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
     ) external onlyLatestContract("stafiDistributor", address(this)) onlyTrustedNode(msg.sender) {
         require(_amount > 0, "zero amount");
 
-        uint256 preDealedHeight = getUint(
-            keccak256(abi.encodePacked("stafiDistributor.distributeSlashAmount.dealedHeight"))
-        );
-        require(_dealedHeight > preDealedHeight, "height already dealed");
+        require(_dealedHeight > getDistributeSlashDealedHeight(), "height already dealed");
 
-        bytes32 proposalId = keccak256(abi.encodePacked(_dealedHeight, _amount));
+        bytes32 proposalId = keccak256(abi.encodePacked("distributeSlashAmount", _dealedHeight, _amount));
         bool needExe = _voteProposal(proposalId);
 
         // Finalize if Threshold has been reached
@@ -160,10 +196,11 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
 
             stafiEther.withdrawEther(_amount);
             stafiUserDeposit.recycleDistributorDeposit{value: _amount}();
-
-            setUint(keccak256(abi.encodePacked("stafiDistributor.distributeSlashAmount.dealedHeight")), _dealedHeight);
+            setDistributeSlashDealedHeight(_dealedHeight);
 
             _afterExecProposal(proposalId);
+
+            emit DistributeSlash(_dealedHeight, _amount);
         }
     }
 
@@ -184,6 +221,8 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
             setMerkleDealedEpoch(_dealedEpoch);
 
             _afterExecProposal(proposalId);
+
+            emit SetMerkleRoot(_dealedEpoch, _merkleRoot);
         }
     }
 
@@ -251,6 +290,14 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
 
     function setDistributeFeeDealedHeight(uint256 _dealedHeight) internal {
         setUint(keccak256(abi.encodePacked("stafiDistributor.distributeFee.dealedHeight")), _dealedHeight);
+    }
+
+    function setDistributeSuperNodeFeeDealedHeight(uint256 _dealedHeight) internal {
+        setUint(keccak256(abi.encodePacked("stafiDistributor.distributeSuperNodeFee.dealedHeight")), _dealedHeight);
+    }
+
+    function setDistributeSlashDealedHeight(uint256 _dealedHeight) internal {
+        setUint(keccak256(abi.encodePacked("stafiDistributor.distributeSlashAmount.dealedHeight")), _dealedHeight);
     }
 
     function _voteProposal(bytes32 _proposalId) internal returns (bool) {

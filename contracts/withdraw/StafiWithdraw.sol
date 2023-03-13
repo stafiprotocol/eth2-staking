@@ -46,6 +46,15 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     event VoteProposal(bytes32 indexed proposalId, address voter);
     event ProposalExecuted(bytes32 indexed proposalId);
     event NotifyValidatorExit(uint256 withdrawCycle, uint256 ejectedStartWithdrawCycle, uint256[] ejectedValidators);
+    event DistributeWithdrawals(
+        uint256 dealedHeight,
+        uint256 userAmount,
+        uint256 nodeAmount,
+        uint256 platformAmount,
+        uint256 maxClaimableWithdrawIndex,
+        uint256 mvAmount
+    );
+    event ReserveEthForWithdraw(uint256 withdrawCycle, uint256 mvAmount);
 
     constructor() StafiBase(address(0)) {
         // By setting the version it is not possible to call setup anymore,
@@ -173,6 +182,7 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     ) external override onlyLatestContract("stafiWithdraw", address(this)) onlyTrustedNode(msg.sender) {
         require(_dealedHeight > latestDistributeHeight, "height already dealed");
         require(_maxClaimableWithdrawIndex < nextWithdrawIndex, "withdraw index over");
+        require(_userAmount.add(_nodeAmount).add(_platformAmount) <= address(this).balance, "balance not enough");
 
         bytes32 proposalId = keccak256(
             abi.encodePacked(_dealedHeight, _userAmount, _nodeAmount, _platformAmount, _maxClaimableWithdrawIndex)
@@ -206,6 +216,15 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
             }
 
             _afterExecProposal(proposalId);
+
+            emit DistributeWithdrawals(
+                _dealedHeight,
+                _userAmount,
+                _nodeAmount,
+                _platformAmount,
+                _maxClaimableWithdrawIndex,
+                mvAmount
+            );
         }
     }
 
@@ -228,6 +247,8 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
                 stafiUserDeposit.withdrawExcessBalanceForWithdraw(mvAmount);
 
                 totalMissingAmountForWithdraw = totalMissingAmountForWithdraw.sub(mvAmount);
+
+                emit ReserveEthForWithdraw(_withdrawCycle, mvAmount);
             }
             _afterExecProposal(proposalId);
         }
