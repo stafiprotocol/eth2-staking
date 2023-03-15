@@ -38,7 +38,28 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         version = 1;
     }
 
-    // Node deposits currently amount
+    receive() external payable {}
+
+    // Receive a ether withdrawal
+    // Only accepts calls from the StafiEther contract
+    function receiveEtherWithdrawal()
+        external
+        payable
+        override
+        onlyLatestContract("stafiDistributor", address(this))
+        onlyLatestContract("stafiEther", msg.sender)
+    {}
+
+    // distribute withdrawals for node/platform, accept calls from stafiWithdraw
+    function distributeWithdrawals() external payable override onlyLatestContract("stafiDistributor", address(this)) {
+        require(msg.value > 0, "zero amount");
+
+        IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
+        stafiEther.depositEther{value: msg.value}();
+    }
+
+    // ------------ getter ------------
+
     function getCurrentNodeDepositAmount() public view returns (uint256) {
         return getUint("settings.node.deposit.amount");
     }
@@ -71,25 +92,15 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         return getUint(keccak256(abi.encodePacked("stafiDistributor.distributeSlashAmount.dealedHeight")));
     }
 
-    receive() external payable {}
+    // ------------ settings ------------
 
-    // Receive a ether withdrawal
-    // Only accepts calls from the StafiEther contract
-    function receiveEtherWithdrawal()
-        external
-        payable
-        override
-        onlyLatestContract("stafiDistributor", address(this))
-        onlyLatestContract("stafiEther", msg.sender)
-    {}
-
-    // distribute withdrawals for node/platform, accept calls from stafiWithdraw
-    function distributeWithdrawals() external payable override onlyLatestContract("stafiDistributor", address(this)) {
-        require(msg.value > 0, "zero amount");
-
-        IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
-        stafiEther.depositEther{value: msg.value}();
+    function updateMerkleRoot(
+        bytes32 _merkleRoot
+    ) external onlyLatestContract("stafiDistributor", address(this)) onlySuperUser {
+        setMerkleRoot(_merkleRoot);
     }
+
+    // ------------ vote ------------
 
     // v1: platform = 10% node = 90%*(nodedeposit/32)+90%*(1- nodedeposit/32)*10%  user = 90%*(1- nodedeposit/32)*90%
     // v2: platform = 5%  node = 5% + (90% * nodedeposit/32) user = 90%*(1-nodedeposit/32)
@@ -141,7 +152,7 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         uint256 _userAmount,
         uint256 _nodeAmount,
         uint256 _platformAmount
-    ) external onlyLatestContract("stafiDistributor", address(this)) {
+    ) external onlyLatestContract("stafiDistributor", address(this)) onlyTrustedNode(msg.sender) {
         uint256 totalAmount = _userAmount.add(_nodeAmount).add(_platformAmount);
         require(totalAmount > 0, "zero amount");
 
@@ -204,7 +215,6 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         }
     }
 
-    // ----- node claim --------------
     function setMerkleRoot(
         uint256 _dealedEpoch,
         bytes32 _merkleRoot
@@ -225,6 +235,8 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
             emit SetMerkleRoot(_dealedEpoch, _merkleRoot);
         }
     }
+
+    // ----- node claim --------------
 
     function claim(
         uint256 _index,
