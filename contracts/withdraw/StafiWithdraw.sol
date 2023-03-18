@@ -259,7 +259,15 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         uint256 _ejectedStartCycle,
         uint256[] calldata _validatorIndexList
     ) external override onlyLatestContract("stafiWithdraw", address(this)) onlyTrustedNode(msg.sender) {
-        require(_ejectedStartCycle < _withdrawCycle && _withdrawCycle < currentWithdrawCycle(), "cycle not match");
+        require(
+            _validatorIndexList.length > 0 && _validatorIndexList.length <= withdrawLimitPerCycle.mul(3).div(20 ether),
+            "length not match"
+        );
+        require(
+            _ejectedStartCycle < _withdrawCycle && _withdrawCycle.add(1) == currentWithdrawCycle(),
+            "cycle not match"
+        );
+        require(ejectedValidatorsAtCycle[_withdrawCycle].length == 0, "already dealed");
 
         bytes32 proposalId = keccak256(abi.encodePacked(_withdrawCycle, _ejectedStartCycle, _validatorIndexList));
         bool needExe = _voteProposal(proposalId);

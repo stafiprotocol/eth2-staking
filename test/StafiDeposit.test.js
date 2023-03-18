@@ -503,7 +503,7 @@ describe("StafiDeposit test", function () {
     //         to: this.ContractStafiSuperNodeFeePool.address,
     //         value: web3.utils.toWei("3", "ether")
     //     })
-        
+
     //     // distribute fee
     //     let distributeFeeTx = await this.ContractStafiDistributor.connect(this.AccountTrustNode1).distributeFee(web3.utils.toWei("35", "ether"), { from: this.AccountUser2.address })
     //     let distributeTxRecipient = await distributeFeeTx.wait()
@@ -703,17 +703,20 @@ describe("StafiDeposit test", function () {
     })
 
     it("notifyValidatorExit should success", async function () {
+        let currentWithdrawCycle = (await this.ContractStafiWithdraw.currentWithdrawCycle())
+        console.log(typeof (currentWithdrawCycle))
+        let preCycle = BigInt(currentWithdrawCycle) - 1n
         // notifyValidatorExit
         let notifyExitTx = await this.ContractStafiWithdraw.connect(this.AccountTrustNode1).notifyValidatorExit(
-            BigInt(36), BigInt(30), [BigInt(6), BigInt(7)])
+            preCycle, BigInt(30), [BigInt(6), BigInt(7)])
         let notifyExit = await notifyExitTx.wait()
         console.log("notifyExit tx gas: ", notifyExit.gasUsed.toString())
 
 
         expect((await this.ContractStafiWithdraw.getEjectedValidatorsAtCycle(BigInt(35))).length.toString()).to.equal("0")
-        expect((await this.ContractStafiWithdraw.getEjectedValidatorsAtCycle(36)).length.toString()).to.equal("2")
-        expect((await this.ContractStafiWithdraw.getEjectedValidatorsAtCycle(36))[0].toString()).to.equal("6")
-        expect((await this.ContractStafiWithdraw.getEjectedValidatorsAtCycle(36))[1].toString()).to.equal("7")
+        expect((await this.ContractStafiWithdraw.getEjectedValidatorsAtCycle(preCycle)).length.toString()).to.equal("2")
+        expect((await this.ContractStafiWithdraw.getEjectedValidatorsAtCycle(preCycle))[0].toString()).to.equal("6")
+        expect((await this.ContractStafiWithdraw.getEjectedValidatorsAtCycle(preCycle))[1].toString()).to.equal("7")
         expect((await this.ContractStafiWithdraw.ejectedStartCycle()).toString()).to.equal("30")
 
         console.log((await this.ContractStafiWithdraw.currentWithdrawCycle()))
