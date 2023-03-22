@@ -116,7 +116,9 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
 
         require(_dealedHeight > getDistributeFeeDealedHeight(), "height already dealed");
 
-        bytes32 proposalId = keccak256(abi.encodePacked(_dealedHeight, _userAmount, _nodeAmount, _platformAmount));
+        bytes32 proposalId = keccak256(
+            abi.encodePacked("distributeFee", _dealedHeight, _userAmount, _nodeAmount, _platformAmount)
+        );
         bool needExe = _voteProposal(proposalId);
 
         // Finalize if Threshold has been reached
@@ -222,7 +224,7 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         uint256 predealedEpoch = getMerkleDealedEpoch();
         require(_dealedEpoch > predealedEpoch, "epoch already dealed");
 
-        bytes32 proposalId = keccak256(abi.encodePacked(_dealedEpoch, _merkleRoot));
+        bytes32 proposalId = keccak256(abi.encodePacked("setMerkleRoot", _dealedEpoch, _merkleRoot));
         bool needExe = _voteProposal(proposalId);
 
         // Finalize if Threshold has been reached

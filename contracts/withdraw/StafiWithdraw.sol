@@ -55,6 +55,8 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         uint256 mvAmount
     );
     event ReserveEthForWithdraw(uint256 withdrawCycle, uint256 mvAmount);
+    event SetWithdrawLimitPerCycle(uint256 withdrawLimitPerCycle);
+    event SetUserWithdrawLimitPerCycle(uint256 userWithdrawLimitPerCycle);
 
     constructor() StafiBase(address(0)) {
         // By setting the version it is not possible to call setup anymore,
@@ -110,10 +112,14 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
 
     function setWithdrawLimitPerCycle(uint256 _withdrawLimitPerCycle) external onlySuperUser {
         withdrawLimitPerCycle = _withdrawLimitPerCycle;
+
+        emit SetWithdrawLimitPerCycle(_withdrawLimitPerCycle);
     }
 
     function setUserWithdrawLimitPerCycle(uint256 _userWithdrawLimitPerCycle) external onlySuperUser {
         userWithdrawLimitPerCycle = _userWithdrawLimitPerCycle;
+
+        emit SetUserWithdrawLimitPerCycle(_userWithdrawLimitPerCycle);
     }
 
     // ------------ user unstake ------------
@@ -136,17 +142,19 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         totalMissingAmountForWithdraw = totalMissingAmount;
 
         bool unstakeInstantly = totalMissingAmountForWithdraw == 0;
+        uint256 willUseWithdrawalIndex = nextWithdrawIndex;
+
+        withdrawalAtIndex[willUseWithdrawalIndex] = Withdrawal({_address: msg.sender, _amount: ethAmount});
+        nextWithdrawIndex = willUseWithdrawalIndex.add(1);
+
+        emit Unstake(msg.sender, _rEthAmount, ethAmount, willUseWithdrawalIndex, unstakeInstantly);
+
         if (unstakeInstantly) {
             (bool result, ) = msg.sender.call{value: ethAmount}("");
             require(result, "Failed to unstake ETH");
         } else {
-            unclaimedWithdrawalsOfUser[msg.sender].add(nextWithdrawIndex);
+            unclaimedWithdrawalsOfUser[msg.sender].add(willUseWithdrawalIndex);
         }
-
-        emit Unstake(msg.sender, _rEthAmount, ethAmount, nextWithdrawIndex, unstakeInstantly);
-
-        withdrawalAtIndex[nextWithdrawIndex] = Withdrawal({_address: msg.sender, _amount: ethAmount});
-        nextWithdrawIndex = nextWithdrawIndex.add(1);
     }
 
     function withdraw(
@@ -185,7 +193,14 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         require(_userAmount.add(_nodeAmount).add(_platformAmount) <= address(this).balance, "balance not enough");
 
         bytes32 proposalId = keccak256(
-            abi.encodePacked(_dealedHeight, _userAmount, _nodeAmount, _platformAmount, _maxClaimableWithdrawIndex)
+            abi.encodePacked(
+                "distributeWithdrawals",
+                _dealedHeight,
+                _userAmount,
+                _nodeAmount,
+                _platformAmount,
+                _maxClaimableWithdrawIndex
+            )
         );
         bool needExe = _voteProposal(proposalId);
 
@@ -269,7 +284,9 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         );
         require(ejectedValidatorsAtCycle[_withdrawCycle].length == 0, "already dealed");
 
-        bytes32 proposalId = keccak256(abi.encodePacked(_withdrawCycle, _ejectedStartCycle, _validatorIndexList));
+        bytes32 proposalId = keccak256(
+            abi.encodePacked("notifyValidatorExit", _withdrawCycle, _ejectedStartCycle, _validatorIndexList)
+        );
         bool needExe = _voteProposal(proposalId);
 
         // Finalize if Threshold has been reached

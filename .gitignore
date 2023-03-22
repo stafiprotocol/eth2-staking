@@ -5,3 +5,4 @@ cache/
 compiler_config.json
 deposit_test.js
 upgrade_dev.js
+script/operate_on_testnet.js
