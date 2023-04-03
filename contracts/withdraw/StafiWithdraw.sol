@@ -150,6 +150,8 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         emit Unstake(msg.sender, _rEthAmount, ethAmount, willUseWithdrawalIndex, unstakeInstantly);
 
         if (unstakeInstantly) {
+            maxClaimableWithdrawIndex = willUseWithdrawalIndex;
+
             (bool result, ) = msg.sender.call{value: ethAmount}("");
             require(result, "Failed to unstake ETH");
         } else {
@@ -206,7 +208,10 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
 
         // Finalize if Threshold has been reached
         if (needExe) {
-            maxClaimableWithdrawIndex = _maxClaimableWithdrawIndex;
+            if (_maxClaimableWithdrawIndex > maxClaimableWithdrawIndex) {
+                maxClaimableWithdrawIndex = _maxClaimableWithdrawIndex;
+            }
+
             latestDistributeHeight = _dealedHeight;
 
             uint256 mvAmount = _userAmount;
