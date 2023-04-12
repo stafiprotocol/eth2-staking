@@ -167,7 +167,7 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
 
         // Finalize if Threshold has been reached
         if (needExe) {
-            IStafiFeePool feePool = IStafiFeePool(getContractAddress("stafiFeePool"));
+            IStafiFeePool feePool = IStafiFeePool(getContractAddress("stafiSuperNodeFeePool"));
             IStafiUserDeposit stafiUserDeposit = IStafiUserDeposit(getContractAddress("stafiUserDeposit"));
             IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
 
