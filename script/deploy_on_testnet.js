@@ -6,12 +6,12 @@ async function main() {
     this.AccountAdmin = this.signers[0]
     this.AccountTrustNode1 = this.signers[1]
     this.AccountSuperNode1 = this.signers[2]
+    this.AccountProxyAdmin = this.signers[5]
 
     this.FactoryStafiNodeDeposit = await ethers.getContractFactory("StafiNodeDeposit", this.AccountAdmin)
     this.FactoryStafiUserDeposit = await ethers.getContractFactory("StafiUserDeposit", this.AccountAdmin)
 
     this.FactoryStafiNetworkBalances = await ethers.getContractFactory("StafiNetworkBalances", this.AccountAdmin)
-    this.FactoryStafiNetworkWithdrawal = await ethers.getContractFactory("StafiNetworkWithdrawal", this.AccountAdmin)
     this.FactoryStafiDistributor = await ethers.getContractFactory("StafiDistributor", this.AccountAdmin)
     this.FactoryStafiFeePool = await ethers.getContractFactory("StafiFeePool", this.AccountAdmin)
     this.FactoryStafiSuperNodeFeePool = await ethers.getContractFactory("StafiSuperNodeFeePool", this.AccountAdmin)
@@ -40,6 +40,10 @@ async function main() {
     this.FactoryStafiEther = await ethers.getContractFactory("StafiEther", this.AccountAdmin)
     this.FactoryStafiUpgrade = await ethers.getContractFactory("StafiUpgrade", this.AccountAdmin)
 
+    this.FactoryStafiWithdraw = await ethers.getContractFactory("StafiWithdraw", this.AccountAdmin)
+    this.FactoryStafiWithdrawProxy = await ethers.getContractFactory("StafiWithdrawProxy", this.AccountAdmin)
+
+
 
 
     this.ContractStafiStorage = await this.FactoryStafiStorage.deploy()
@@ -60,10 +64,12 @@ async function main() {
 
     // Notice: need update on different network
     // zhejiang: 0x4242424242424242424242424242424242424242
+    // sepolia: 0x7f02C3E3c98b133055B8B348B2Ac625669Ed295D
+    // goerli: 0xff50ed3d0ec03ac01d4c79aad74928bff48a7b2b
 
     // this.ContractDepositContract = await this.FactoryDepositContract.deploy()
     // await this.ContractDepositContract.deployed()
-    this.ContractDepositContractAddress = "0x4242424242424242424242424242424242424242"
+    this.ContractDepositContractAddress = "0xff50ed3d0ec03ac01d4c79aad74928bff48a7b2b"
     console.log("contract ethDepositContract address: ", this.ContractDepositContractAddress)
     await this.ContractStafiUpgrade.addContract("ethDeposit", this.ContractDepositContractAddress)
 
@@ -140,10 +146,6 @@ async function main() {
     console.log("contract stafiNetworkBalances address: ", this.ContractStafiNetworkBalances.address)
     await this.ContractStafiUpgrade.addContract("stafiNetworkBalances", this.ContractStafiNetworkBalances.address)
 
-    this.ContractStafiNetworkWithdrawal = await this.FactoryStafiNetworkWithdrawal.deploy(this.ContractStafiStorage.address)
-    await this.ContractStafiNetworkWithdrawal.deployed()
-    console.log("contract stafiNetworkWithdrawal address: ", this.ContractStafiNetworkWithdrawal.address)
-    await this.ContractStafiUpgrade.addContract("stafiNetworkWithdrawal", this.ContractStafiNetworkWithdrawal.address)
 
     this.ContractStafiDistributor = await this.FactoryStafiDistributor.deploy(this.ContractStafiStorage.address)
     await this.ContractStafiDistributor.deployed()
@@ -172,11 +174,22 @@ async function main() {
     console.log("contract stafiUserDeposit address: ", this.ContractStafiUserDeposit.address)
     await this.ContractStafiUpgrade.addContract("stafiUserDeposit", this.ContractStafiUserDeposit.address)
 
+    this.ContractStafiWithdraw = await this.FactoryStafiWithdraw.deploy()
+    await this.ContractStafiWithdraw.deployed()
+    console.log("ContractStafiWithdraw address: ", this.ContractStafiWithdraw.address)
+
+    this.ContractStafiWithdrawProxy = await this.FactoryStafiWithdrawProxy.deploy(this.ContractStafiWithdraw.address, this.AccountProxyAdmin.address, [])
+    await this.ContractStafiWithdrawProxy.deployed()
+    console.log("ContractStafiWithdrawProxy address: ", this.ContractStafiWithdrawProxy.address)
+    await this.ContractStafiUpgrade.addContract("stafiWithdraw", this.ContractStafiWithdrawProxy.address)
 
 
+
+    // set params
     await this.ContractStafiUpgrade.initStorage(true)
 
-    this.WithdrawalCredentials = '0x00325b04539edc57dfb7d0e3f414ae51f1a601608fa05c79a1660f531084d7ee'
+    this.WithdrawalCredentials = '0x010000000000000000000000' + this.ContractStafiWithdrawProxy.address.substring(2)
+    console.log("WithdrawalCredentials: ", this.WithdrawalCredentials)
     await this.ContractStafiNetworkSettings.setWithdrawalCredentials(this.WithdrawalCredentials)
 
     await this.ContractStafiNodeManager.connect(this.AccountAdmin).setNodeTrusted(this.AccountTrustNode1.address, true)
@@ -186,7 +199,8 @@ async function main() {
     await this.ContractStafiLightNode.connect(this.AccountAdmin).setLightNodeDepositEnabled(true)
     await this.ContractStafiSuperNode.connect(this.AccountAdmin).setSuperNodeDepositEnabled(true)
 
-    console.log("admin balance: ", this.AccountAdmin.address, (await ethers.provider.getBalance(this.AccountAdmin.address)).toString())
+    console.log("admin address: ", this.AccountAdmin.address, (await ethers.provider.getBalance(this.AccountAdmin.address)).toString())
+    console.log("proxy admin address:", this.AccountProxyAdmin.address)
     console.log("trust node address:", this.AccountTrustNode1.address)
     console.log("super node address:", this.AccountSuperNode1.address)
 }

@@ -38,7 +38,7 @@ yarn size
 # deploy
 
 ```
-yarn hardhat run deploy_test.js --network xxxxx
+yarn hardhat run ./script/deploy_on_testnet.js --network xxx
 ```
 
 # verify in etherscan
