@@ -32,6 +32,7 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
     event DistributeSuperNodeFee(uint256 dealedHeight, uint256 userAmount, uint256 nodeAmount, uint256 platformAmount);
     event DistributeSlash(uint256 dealedHeight, uint256 slashAmount);
     event SetMerkleRoot(uint256 dealedEpoch, bytes32 merkleRoot);
+    event SetPlatformTotalAmount(uint256 dealedEpoch, uint256 totalAmount);
 
     // Construct
     constructor(address _stafiStorageAddress) StafiBase(_stafiStorageAddress) {
@@ -92,12 +93,36 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         return getUint(keccak256(abi.encodePacked("stafiDistributor.distributeSlashAmount.dealedHeight")));
     }
 
+    function getPlatformTotalAmount() public view returns (uint256) {
+        return getUint(keccak256(abi.encodePacked("stafiDistributor.platform.totalAmount")));
+    }
+
+    function getPlatformTotalClaimedAmount() public view returns (uint256) {
+        return getUint(keccak256(abi.encodePacked("stafiDistributor.platform.totalClaimedAmount")));
+    }
+
     // ------------ settings ------------
 
     function updateMerkleRoot(
         bytes32 _merkleRoot
     ) external onlyLatestContract("stafiDistributor", address(this)) onlySuperUser {
         setMerkleRoot(_merkleRoot);
+    }
+
+    function claimPlatformFee(
+        address _receiver
+    ) external onlyLatestContract("stafiDistributor", address(this)) onlySuperUser {
+        uint256 totalAmount = getPlatformTotalAmount();
+        uint256 willClaimAmount = totalAmount.sub(getPlatformTotalClaimedAmount());
+        if (willClaimAmount > 0) {
+            setPlatformTotalClaimedAmount(totalAmount);
+
+            IStafiEther stafiEther = IStafiEther(getContractAddress("stafiEther"));
+            stafiEther.withdrawEther(willClaimAmount);
+
+            (bool success, ) = _receiver.call{value: willClaimAmount}("");
+            require(success, "failed to claim ETH");
+        }
     }
 
     // ------------ vote ------------
@@ -238,6 +263,25 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         }
     }
 
+    function setPlatformTotalAmount(
+        uint256 _dealedEpoch,
+        uint256 _totalAmount
+    ) external onlyLatestContract("stafiDistributor", address(this)) onlyTrustedNode(msg.sender) {
+        require(_totalAmount > getPlatformTotalAmount(), "amount less than old");
+
+        bytes32 proposalId = keccak256(abi.encodePacked("setPlatformTotalAmount", _dealedEpoch, _totalAmount));
+        bool needExe = _voteProposal(proposalId);
+
+        // Finalize if Threshold has been reached
+        if (needExe) {
+            setPlatformTotalAmount(_totalAmount);
+
+            _afterExecProposal(proposalId);
+
+            emit SetPlatformTotalAmount(_dealedEpoch, _totalAmount);
+        }
+    }
+
     // ----- node claim --------------
 
     function claim(
@@ -312,6 +356,14 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
 
     function setDistributeSlashDealedHeight(uint256 _dealedHeight) internal {
         setUint(keccak256(abi.encodePacked("stafiDistributor.distributeSlashAmount.dealedHeight")), _dealedHeight);
+    }
+
+    function setPlatformTotalAmount(uint256 _totalAmount) internal {
+        setUint(keccak256(abi.encodePacked("stafiDistributor.platform.totalAmount")), _totalAmount);
+    }
+
+    function setPlatformTotalClaimedAmount(uint256 _totalClaimedAmount) internal {
+        setUint(keccak256(abi.encodePacked("stafiDistributor.platform.totalClaimedAmount")), _totalClaimedAmount);
     }
 
     function _voteProposal(bytes32 _proposalId) internal returns (bool) {

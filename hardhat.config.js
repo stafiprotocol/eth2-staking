@@ -14,7 +14,7 @@ module.exports = {
     version: "0.7.6",
     settings: {
       optimizer: {
-        enabled: true,
+        enabled: false,
         runs: 200
       }
     }
@@ -26,42 +26,42 @@ module.exports = {
         blockNumber: 15431470
       }
     },
-    local: {
-      url: 'http://127.0.0.1:8545',
-      accounts: [
-        `${process.env.ACCOUNT1}`,
-        `${process.env.ACCOUNT2}`,
-        `${process.env.ACCOUNT3}`,
-        `${process.env.ACCOUNT4}`,
-        `${process.env.ACCOUNT5}`,
-        `${process.env.ACCOUNT6}`,
-      ],
-    },
+    // local: {
+    //   url: 'http://127.0.0.1:8545',
+    //   accounts: [
+    //     `${process.env.ACCOUNT1}`,
+    //     `${process.env.ACCOUNT2}`,
+    //     `${process.env.ACCOUNT3}`,
+    //     `${process.env.ACCOUNT4}`,
+    //     `${process.env.ACCOUNT5}`,
+    //     `${process.env.ACCOUNT6}`,
+    //   ],
+    // },
     mainnet: {
       url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
     },
-    goerli: {
-      url: `https://goerli.infura.io/v3/${process.env.INFURA_KEY}`,
-      accounts: [
-        `${process.env.ACCOUNT1}`,
-        `${process.env.ACCOUNT2}`,
-        `${process.env.ACCOUNT3}`,
-        `${process.env.ACCOUNT4}`,
-        `${process.env.ACCOUNT5}`,
-        `${process.env.ACCOUNT6}`,
-      ],
-    },
-    sepolia: {
-      url: `https://sepolia.infura.io/v3/${process.env.INFURA_KEY}`,
-      accounts: [
-        `${process.env.ACCOUNT1}`,
-        `${process.env.ACCOUNT2}`,
-        `${process.env.ACCOUNT3}`,
-        `${process.env.ACCOUNT4}`,
-        `${process.env.ACCOUNT5}`,
-        `${process.env.ACCOUNT6}`,
-      ],
-    }
+    // goerli: {
+    //   url: `https://goerli.infura.io/v3/${process.env.INFURA_KEY}`,
+    //   accounts: [
+    //     `${process.env.ACCOUNT1}`,
+    //     `${process.env.ACCOUNT2}`,
+    //     `${process.env.ACCOUNT3}`,
+    //     `${process.env.ACCOUNT4}`,
+    //     `${process.env.ACCOUNT5}`,
+    //     `${process.env.ACCOUNT6}`,
+    //   ],
+    // },
+    // sepolia: {
+    //   url: `https://sepolia.infura.io/v3/${process.env.INFURA_KEY}`,
+    //   accounts: [
+    //     `${process.env.ACCOUNT1}`,
+    //     `${process.env.ACCOUNT2}`,
+    //     `${process.env.ACCOUNT3}`,
+    //     `${process.env.ACCOUNT4}`,
+    //     `${process.env.ACCOUNT5}`,
+    //     `${process.env.ACCOUNT6}`,
+    //   ],
+    // }
   },
   defaultNetwork: "hardhat",
   paths: {
