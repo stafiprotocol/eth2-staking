@@ -267,8 +267,6 @@ contract StafiDistributor is StafiBase, IStafiEtherWithdrawer, IStafiDistributor
         uint256 _dealedEpoch,
         uint256 _totalAmount
     ) external onlyLatestContract("stafiDistributor", address(this)) onlyTrustedNode(msg.sender) {
-        require(_totalAmount > getPlatformTotalAmount(), "amount less than old");
-
         bytes32 proposalId = keccak256(abi.encodePacked("setPlatformTotalAmount", _dealedEpoch, _totalAmount));
         bool needExe = _voteProposal(proposalId);
 
