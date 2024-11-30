@@ -106,5 +106,12 @@ contract StafiNetworkSettings is StafiBase, IStafiNetworkSettings {
     function setSuperNodePubkeyLimit(uint256 _value) public onlySuperUser {
         setUintS("settings.network.superNode.pubkeyLimit", _value);
     }
+    
+    function transferOwner(address _newOwner) public onlyOwner {
+        require(_newOwner != address(0), "empty address");
+
+        deleteBool(keccak256(abi.encodePacked("access.role", "owner", msg.sender)));
+        setBool(keccak256(abi.encodePacked("access.role", "owner", _newOwner)), true);
+    }
 
 }
