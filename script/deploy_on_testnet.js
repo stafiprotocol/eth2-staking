@@ -50,6 +50,7 @@ async function main() {
     await this.ContractStafiStorage.deployed()
     console.log("contract stafiStorage address: ", this.ContractStafiStorage.address)
 
+
     this.ContractStafiUpgrade = await this.FactoryStafiUpgrade.deploy(this.ContractStafiStorage.address)
     await this.ContractStafiUpgrade.deployed()
     console.log("contract stafiUpgrade address: ", this.ContractStafiUpgrade.address)
@@ -66,10 +67,12 @@ async function main() {
     // zhejiang: 0x4242424242424242424242424242424242424242
     // sepolia: 0x7f02C3E3c98b133055B8B348B2Ac625669Ed295D
     // goerli: 0xff50ed3d0ec03ac01d4c79aad74928bff48a7b2b
+    // hoodi: 0x00000000219ab540356cBB839Cbe05303d7705Fa
 
     // this.ContractDepositContract = await this.FactoryDepositContract.deploy()
     // await this.ContractDepositContract.deployed()
-    this.ContractDepositContractAddress = "0xff50ed3d0ec03ac01d4c79aad74928bff48a7b2b"
+
+    this.ContractDepositContractAddress = "0x00000000219ab540356cBB839Cbe05303d7705Fa"
     console.log("contract ethDepositContract address: ", this.ContractDepositContractAddress)
     await this.ContractStafiUpgrade.addContract("ethDeposit", this.ContractDepositContractAddress)
 
