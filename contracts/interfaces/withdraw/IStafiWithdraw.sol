@@ -1,5 +1,5 @@
 pragma solidity 0.7.6;
-
+pragma abicoder v2;
 // SPDX-License-Identifier: GPL-3.0-only
 
 interface IStafiWithdraw {
@@ -10,11 +10,7 @@ interface IStafiWithdraw {
     function withdraw(uint256[] calldata _withdrawIndexList) external;
 
     // ejector
-    function notifyValidatorExit(
-        uint256 _withdrawCycle,
-        uint256 _ejectedStartWithdrawCycle,
-        uint256[] calldata _validatorIndex
-    ) external;
+    function requestValidatorExit(uint256 _withdrawCycle, bytes[] calldata _validatorIndex) external payable;
 
     // voter
     function distributeWithdrawals(

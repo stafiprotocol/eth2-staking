@@ -8,6 +8,15 @@ const { ProxyAgent, setGlobalDispatcher } = require("undici");
 const proxyAgent = new ProxyAgent('http://127.0.0.1:7890'); // change to yours
 setGlobalDispatcher(proxyAgent)
 
+const accounts = [];
+
+for (let i = 0; i <= 5; i++) {
+  const key = process.env[`ACCOUNT${i}`];
+  if (key && key.length === 64) {
+    accounts.push(key);
+  }
+}
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
@@ -26,42 +35,13 @@ module.exports = {
         blockNumber: 15431470
       }
     },
-    // local: {
-    //   url: 'http://127.0.0.1:8545',
-    //   accounts: [
-    //     `${process.env.ACCOUNT1}`,
-    //     `${process.env.ACCOUNT2}`,
-    //     `${process.env.ACCOUNT3}`,
-    //     `${process.env.ACCOUNT4}`,
-    //     `${process.env.ACCOUNT5}`,
-    //     `${process.env.ACCOUNT6}`,
-    //   ],
-    // },
     mainnet: {
       url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
     },
-    // goerli: {
-    //   url: `https://goerli.infura.io/v3/${process.env.INFURA_KEY}`,
-    //   accounts: [
-    //     `${process.env.ACCOUNT1}`,
-    //     `${process.env.ACCOUNT2}`,
-    //     `${process.env.ACCOUNT3}`,
-    //     `${process.env.ACCOUNT4}`,
-    //     `${process.env.ACCOUNT5}`,
-    //     `${process.env.ACCOUNT6}`,
-    //   ],
-    // },
-    // sepolia: {
-    //   url: `https://sepolia.infura.io/v3/${process.env.INFURA_KEY}`,
-    //   accounts: [
-    //     `${process.env.ACCOUNT1}`,
-    //     `${process.env.ACCOUNT2}`,
-    //     `${process.env.ACCOUNT3}`,
-    //     `${process.env.ACCOUNT4}`,
-    //     `${process.env.ACCOUNT5}`,
-    //     `${process.env.ACCOUNT6}`,
-    //   ],
-    // }
+    hoodi: {
+      url: `https://lingering-snowy-paper.ethereum-hoodi.quiknode.pro/${process.env.QUIKNODE_API_KEY}`,
+      accounts: accounts,
+    },
   },
   defaultNetwork: "hardhat",
   paths: {

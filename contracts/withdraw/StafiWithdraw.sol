@@ -1,4 +1,5 @@
 pragma solidity 0.7.6;
+pragma abicoder v2;
 // SPDX-License-Identifier: GPL-3.0-only
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
@@ -20,6 +21,8 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
 
+    address public constant WITHDRAWAL_QUEUE_ADDRESS = 0x00000961Ef480Eb55e80D19ad83579A64c007002;
+
     struct Withdrawal {
         address _address;
         uint256 _amount;
@@ -27,7 +30,7 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
 
     uint256 public nextWithdrawIndex;
     uint256 public maxClaimableWithdrawIndex;
-    uint256 public ejectedStartCycle;
+    uint256 public requestedValidatorExitCycle; // old name ‘ejectedStartCycle’ is deprecated
     uint256 public latestDistributeHeight;
     uint256 public totalMissingAmountForWithdraw;
     uint256 public withdrawLimitPerCycle;
@@ -37,7 +40,7 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     mapping(address => EnumerableSet.UintSet) internal unclaimedWithdrawalsOfUser;
     mapping(uint256 => uint256) public totalWithdrawAmountAtCycle;
     mapping(address => mapping(uint256 => uint256)) public userWithdrawAmountAtCycle;
-    mapping(uint256 => uint256[]) public ejectedValidatorsAtCycle;
+    mapping(uint256 => uint256[]) public ejectedValidatorsAtCycle; // deprecated
 
     // ------------ events ------------
     event EtherDeposited(address indexed from, uint256 amount, uint256 time);
@@ -45,7 +48,7 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     event Withdraw(address indexed from, uint256[] withdrawIndexList);
     event VoteProposal(bytes32 indexed proposalId, address voter);
     event ProposalExecuted(bytes32 indexed proposalId);
-    event NotifyValidatorExit(uint256 withdrawCycle, uint256 ejectedStartWithdrawCycle, uint256[] ejectedValidators);
+    event RequestValidatorExit(uint256 withdrawCycle, bytes[] ejectedValidators);
     event DistributeWithdrawals(
         uint256 dealedHeight,
         uint256 userAmount,
@@ -274,32 +277,26 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         }
     }
 
-    function notifyValidatorExit(
+    function requestValidatorExit(
         uint256 _withdrawCycle,
-        uint256 _ejectedStartCycle,
-        uint256[] calldata _validatorIndexList
-    ) external override onlyLatestContract("stafiWithdraw", address(this)) onlyTrustedNode(msg.sender) {
+        bytes[] calldata _validatorList
+    ) external payable override onlyLatestContract("stafiWithdraw", address(this)) onlyTrustedNode(msg.sender) {
         require(
-            _validatorIndexList.length > 0 && _validatorIndexList.length <= withdrawLimitPerCycle.mul(3).div(20 ether),
+            _validatorList.length > 0 && _validatorList.length <= withdrawLimitPerCycle.mul(3).div(20 ether),
             "length not match"
         );
-        require(
-            _ejectedStartCycle < _withdrawCycle && _withdrawCycle.add(1) == currentWithdrawCycle(),
-            "cycle not match"
-        );
-        require(ejectedValidatorsAtCycle[_withdrawCycle].length == 0, "already dealed");
+        require(_withdrawCycle.add(1) == currentWithdrawCycle(), "cycle not match");
+        require(_withdrawCycle > requestedValidatorExitCycle, "already requested cycle");
 
-        bytes32 proposalId = keccak256(
-            abi.encodePacked("notifyValidatorExit", _withdrawCycle, _ejectedStartCycle, _validatorIndexList)
-        );
+        bytes32 proposalId = keccak256(abi.encode("notifyValidatorExit", _withdrawCycle, _validatorList));
         bool needExe = _voteProposal(proposalId);
 
         // Finalize if Threshold has been reached
         if (needExe) {
-            ejectedValidatorsAtCycle[_withdrawCycle] = _validatorIndexList;
-            ejectedStartCycle = _ejectedStartCycle;
+            requestedValidatorExitCycle = _withdrawCycle;
+            _requestExit(_validatorList, msg.value);
 
-            emit NotifyValidatorExit(_withdrawCycle, _ejectedStartCycle, _validatorIndexList);
+            emit RequestValidatorExit(_withdrawCycle, _validatorList);
 
             _afterExecProposal(proposalId);
         }
@@ -370,5 +367,31 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
         setBool(proposalKey, true);
 
         emit ProposalExecuted(_proposalId);
+    }
+
+    function _requestExit(bytes[] calldata _pubkeyList, uint256 requestFeeLimit) internal {
+        for (uint256 i = 0; i < _pubkeyList.length; i++) {
+            (bool readOK, bytes memory feeData) = WITHDRAWAL_QUEUE_ADDRESS.staticcall("");
+            if (!readOK) {
+                revert("reading fee failed");
+            }
+            uint256 fee = abi.decode(feeData, (uint256));
+
+            if (fee > requestFeeLimit) {
+                revert("fee is too high");
+            }
+            requestFeeLimit = requestFeeLimit.sub(fee);
+
+            bytes memory callData = abi.encodePacked(_pubkeyList[i], uint64(0));
+            (bool writeOK, ) = WITHDRAWAL_QUEUE_ADDRESS.call{value: fee}(callData);
+            if (!writeOK) {
+                revert("request exit failed");
+            }
+        }
+
+        if (requestFeeLimit > 0) {
+            (bool success, ) = msg.sender.call{value: requestFeeLimit}("");
+            require(success, "failed to refund fee");
+        }
     }
 }
