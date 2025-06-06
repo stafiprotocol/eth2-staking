@@ -26,6 +26,4 @@ interface IStafiWithdraw {
     function depositEth() external payable;
 
     function getUnclaimedWithdrawalsOfUser(address user) external view returns (uint256[] memory);
-
-    function getEjectedValidatorsAtCycle(uint256 cycle) external view returns (uint256[] memory);
 }

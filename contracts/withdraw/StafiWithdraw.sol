@@ -40,7 +40,7 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
     mapping(address => EnumerableSet.UintSet) internal unclaimedWithdrawalsOfUser;
     mapping(uint256 => uint256) public totalWithdrawAmountAtCycle;
     mapping(address => mapping(uint256 => uint256)) public userWithdrawAmountAtCycle;
-    mapping(uint256 => uint256[]) public ejectedValidatorsAtCycle; // deprecated
+    mapping(uint256 => uint256[]) public ejectedValidatorsAtCycle_; // deprecated
 
     // ------------ events ------------
     event EtherDeposited(address indexed from, uint256 amount, uint256 time);
@@ -101,10 +101,6 @@ contract StafiWithdraw is StafiBase, IStafiWithdraw {
             withdrawals[i] = (unclaimedWithdrawalsOfUser[user].at(i));
         }
         return withdrawals;
-    }
-
-    function getEjectedValidatorsAtCycle(uint256 cycle) external view override returns (uint256[] memory) {
-        return ejectedValidatorsAtCycle[cycle];
     }
 
     function currentWithdrawCycle() public view returns (uint256) {
