@@ -1,6 +1,6 @@
 # Introduction
 
-The illiquidity of staked ETH may deter user participation and calls for an immediate solution. As a project dedicated to addressing the liquidity issue of staked assets, Stafi team hereby propose the rETH solution, which allows for Ethereum 2.0 liquid staking at ease.
+The illiquidity of staked ETH may deter users from participating and calls for an immediate solution. As a project dedicated to addressing the liquidity issue of staked assets, StaFi team hereby proposes the rETH solution, enabling Ethereum 2.0 liquid staking with ease.
 
 # Design goals
 
